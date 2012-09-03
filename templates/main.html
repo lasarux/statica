@@ -1,0 +1,82 @@
+{% extends 'base.html' %}
+{% block content %}
+
+
+  <!-- Main hero unit for a primary marketing message or call to action -->
+  <div class="hero-unit">
+  	<img style="float: left; margin-right: 30px;" alt="les ginestes logo" src="../static/img/lesginestes_logo.png" />
+    {{ main_top }}
+    <p><a class="btn btn-primary btn-large" data-toggle="modal" href="#moreInfo">{{ main_top.buttontext }}</a></p>
+  </div>
+  
+  <div class="modal hide" id="moreInfo">
+    <div class="modal-header">
+      <button type="button" class="close" data-dismiss="modal">×</button>
+      <h3>{{ main_form.title }}</h3>
+    </div>
+    <div class="modal-body">
+  	  <form class="form-horizontal" action="/info.html" method="GET">
+  		<div class="control-group">
+  		  <label class="control-label" for="input01">{{ main_form.name }}</label>
+  		  <div class="controls">
+  			<input type="text" class="input-xlarge" name="name" id="input01">
+  		  </div>
+  		</div>
+  		<div class="control-group">
+            <label class="control-label" for="inputIcon">{{ main_form.email }}</label>
+            <div class="controls">
+              <div class="input-prepend">
+                <span class="add-on"><i class="icon-envelope"></i></span><input class="input-large" id="inputIcon" type="text">
+              </div>
+            </div>
+  		</div>
+  		<div class="control-group">
+  		  <label class="control-label"></label>
+  		  <div class="controls">
+  			<button type="submit" class="btn">{{ main_form.submit }}</button>
+  		  </div>
+  		</div>	
+  	  </form>
+    </div>
+  </div>
+  
+  <!-- Main row of columns -->
+  <div class="row">
+    <div class="span4">
+    	{{ main_left }}
+  		<!-- <p><a class="btn" href="#">View details &raquo;</a></p> -->
+  	</div>
+    <div class="span4">
+		{{ main_middle }}
+	</div>
+	<div class="well span4" style="width:27%">
+		{{ main_right }}
+		
+		<!-- BEGIN progress bar -->
+		<br>
+		<div class="progress">
+			<div style="width:{{ main_right.done}}%;" class="bar bar-success"></div>
+			<div style="width:{{ main_right.progress }}%;" class="bar bar-warning"></div>
+		</div>
+		<p>
+			<a class="btn" data-toggle="modal" href="#plaInfo">
+			    <i class="icon-info-sign"></i> {{ main_right.button }}
+		    </a>
+		</p>
+		<br>
+		<!-- END progress bar -->
+		
+		<!-- BEGIN modal table -->
+		<div class="modal hide data" id="plaInfo">
+		    <div class="modal-header">
+		      <button type="button" class="close" data-dismiss="modal">×</button>
+		      <h3>{{ main_table.title }}</h3>
+		    </div>
+		    <div class="modal-body">
+				{{ main_table }}
+			</div>
+		</div>
+		<!-- END modal table -->
+	</div>
+  </div>
+{% endblock content %}
