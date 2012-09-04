@@ -24,9 +24,9 @@
   <link rel="apple-touch-icon-precomposed" sizes="72x72" href="{{ ico.apple_touch_icon_72_precomposed }}">
   <link rel="apple-touch-icon-precomposed" href="{{ ico.apple_touch_icon_57_precomposed }}">
   {{ builtins.google_analytics }}
+  {{ builtins.google_maps }}
 </head>
-<body>
-
+<body onload="initialize()">
 <div class="btn-toolbar choose-lang">
   <div class="btn-group">
     <button class="btn btn-mini btn-success">Idioma</button>

@@ -1,6 +1,7 @@
 done: 510/960.*100
 progress: 110/960.*100
 button: Ver cuadro de amortización
+place: Ubicación
 
 ##Progreso
 

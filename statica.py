@@ -4,7 +4,7 @@ __author__ = "Pedro Gracia"
 __copyright__ = "Copyright 2012, Impulzia S.L."
 __credits__ = ["Pedro Gracia"]
 __license__ = "BSD"
-__version__ = "0.3"
+__version__ = "0.4"
 __maintainer__ = "Pedro Gracia"
 __email__ = "pedro.gracia@impulzia.com"
 __status__ = "Development"
@@ -39,6 +39,25 @@ google_analytics = Template("""<script type="text/javascript">
     })();
 
   </script>""")
+  
+google_maps = Template("""<script src="https://maps.googleapis.com/maps/api/js?sensor=false"></script>
+<script>
+  function initialize() {
+    var myLatlng = new google.maps.LatLng({{ lat }}, {{ lon }});
+    var mapOptions = {
+      zoom: {{ zoom }},
+      center: myLatlng,
+      mapTypeId: google.maps.MapTypeId.ROADMAP
+    }
+    var map = new google.maps.Map(document.getElementById('map_canvas'), mapOptions);
+
+    var marker = new google.maps.Marker({
+        position: myLatlng,
+        map: map,
+        title: '{{ title }}'
+    });
+  }
+</script>""")
 
 # initialize makdown object
 md = markdown.Markdown(safe_mode=False, extensions=['tables', 'superscript'])
@@ -128,11 +147,11 @@ def main():
     
     try:
         import resources.settings as settings
-        if settings.analytics_id:
-            builtins['google_analytics'] = google_analytics.render(analytics_id=settings.analytics_id)
+        builtins['google_analytics'] = google_analytics.render(analytics_id=settings.analytics_id)
+        builtins['google_maps'] = google_maps.render(zoom=settings.map_zoom, lat=settings.map_lat, lon=settings.map_lon, title=settings.map_title)
     except:
-        pass
-            
+        print "Error"
+           
     for root, dirs, files in os.walk(RESOURCES_DIR):
         if root == RESOURCES_DIR:
             # process resources for each languages

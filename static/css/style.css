@@ -24,3 +24,12 @@ body {
 	right: 10px; 
 	top: 0px;
 }
+
+#map {
+	border: 1px gray;
+	margin: 30px;
+}
+
+#map_canvas {
+    height:300px;
+}
