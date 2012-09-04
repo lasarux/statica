@@ -19,6 +19,7 @@ from jinja2 import Environment, FileSystemLoader
 
 # initial constants
 RESOURCES_DIR = 'resources/'
+STATIC_DIR = 'static/'
 TEMPLATES_DIR = 'templates/'
 TEMPLATE_DEFAULT = 'main.html'
 BUILD_DIR = 'build/'
@@ -30,6 +31,29 @@ md = markdown.Markdown(safe_mode=False, extensions=['tables', 'superscript'])
 # initialize jinja2 objects
 env = Environment(loader=FileSystemLoader(TEMPLATES_DIR))
 template = env.get_template(TEMPLATE_DEFAULT)
+
+class Static:
+    """Basic Object for css, js and images resources"""
+    def __init__(self):
+        self.css = {}
+        self.js = {}
+        self.img = {}
+        self.ico = {}
+        self.include('css')
+        self.include('js')
+        self.include('img')
+        self.include('ico')
+        
+    def include(self, t):
+        """walk throught static dirs to get files"""
+        for root, dirs, files in os.walk(os.path.join(STATIC_DIR, t)):
+            for file in files:
+                key_split = file.split('.')
+                key = '.'.join(key_split[:-1])
+                r = getattr(self, t)
+                key = key.replace('-', '_').replace('.', '_')
+                r[key] = '../static/%s/%s' % (t, file)
+
 
 class Box:
     """Basic Page object"""
@@ -84,6 +108,9 @@ class Box:
         
 
 def main():
+    # main function
+    res = Static()
+    
     for root, dirs, files in os.walk(RESOURCES_DIR):
         if root == RESOURCES_DIR and 'config' in files:
             pass #TODO: parse config file
@@ -96,17 +123,17 @@ def main():
             for root, dirs, files in os.walk(os.path.join(RESOURCES_DIR, lang)):
                 boxes = {}
                 for file in files:
-                    print file
                     #TODO: check extension (markdown, html, etc.)
                     box = Box(join(root, file))
-                    data = file.split('.')[0]
-                    boxes[data] = box.parse()
+                    key = file.split('.')[0]
+                    boxes[key] = box.parse()
 
                 # write output file
                 boxes['current_language'] = lang
-                output = template.render(**boxes)
+                output = template.render(css=res.css, js=res.js, img=res.img, ico=res.ico, **boxes)
                 codecs.open(os.path.join(BUILD_DIR, lang, 'index.html'), 'w', 'utf-8').write(output)
     
+    shutil.rmtree(os.path.join(BUILD_DIR, 'static/'))
     shutil.copytree('static/', os.path.join(BUILD_DIR, 'static/'))
 
 if __name__ == '__main__':
