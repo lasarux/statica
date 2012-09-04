@@ -4,7 +4,7 @@ __author__ = "Pedro Gracia"
 __copyright__ = "Copyright 2012, Impulzia S.L."
 __credits__ = ["Pedro Gracia"]
 __license__ = "BSD"
-__version__ = "0.2"
+__version__ = "0.3"
 __maintainer__ = "Pedro Gracia"
 __email__ = "pedro.gracia@impulzia.com"
 __status__ = "Development"
@@ -14,7 +14,7 @@ import codecs
 from os.path import join, getsize
 import shutil
 import markdown
-from jinja2 import Environment, FileSystemLoader
+from jinja2 import Environment, FileSystemLoader, Template
 
 
 # initial constants
@@ -25,6 +25,20 @@ TEMPLATE_DEFAULT = 'main.html'
 BUILD_DIR = 'build/'
 LANGUAGES = ['ca', 'es']
 #DEFAULT_LANGUAGE = 'ca'
+
+google_analytics = Template("""<script type="text/javascript">
+
+    var _gaq = _gaq || [];
+    _gaq.push(['_setAccount', '{{ analytics_id }}']);
+    _gaq.push(['_trackPageview']);
+
+    (function() {
+      var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+      ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+      var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+    })();
+
+  </script>""")
 
 # initialize makdown object
 md = markdown.Markdown(safe_mode=False, extensions=['tables', 'superscript'])
@@ -110,28 +124,32 @@ class Box:
 def main():
     # main function
     res = Static()
+    builtins = {}
     
+    try:
+        import resources.settings as settings
+        if settings.analytics_id:
+            builtins['google_analytics'] = google_analytics.render(analytics_id=settings.analytics_id)
+    except:
+        pass
+            
     for root, dirs, files in os.walk(RESOURCES_DIR):
-        if root == RESOURCES_DIR and 'config' in files:
-            pass #TODO: parse config file
-        
-        if files:
-            # TODO: this is an ugly hack - remove it!
-            continue
-        # process resources for each languages
-        for lang in dirs:
-            for root, dirs, files in os.walk(os.path.join(RESOURCES_DIR, lang)):
-                boxes = {}
-                for file in files:
-                    #TODO: check extension (markdown, html, etc.)
-                    box = Box(join(root, file))
-                    key = file.split('.')[0]
-                    boxes[key] = box.parse()
+        if root == RESOURCES_DIR:
+            # process resources for each languages
+            for lang in dirs:
+                for root, dirs, files in os.walk(os.path.join(RESOURCES_DIR, lang)):
+                    boxes = {}
+                    for file in files:
+                        #TODO: check extension (markdown, html, etc.)
+                        box = Box(join(root, file))
+                        key = file.split('.')[0]
+                        boxes[key] = box.parse()
 
-                # write output file
-                boxes['current_language'] = lang
-                output = template.render(css=res.css, js=res.js, img=res.img, ico=res.ico, **boxes)
-                codecs.open(os.path.join(BUILD_DIR, lang, 'index.html'), 'w', 'utf-8').write(output)
+                    # write output file
+                    boxes['current_language'] = lang
+                    boxes['builtins'] = builtins
+                    output = template.render(css=res.css, js=res.js, img=res.img, ico=res.ico, **boxes)
+                    codecs.open(os.path.join(BUILD_DIR, lang, 'index.html'), 'w', 'utf-8').write(output)
     
     shutil.rmtree(os.path.join(BUILD_DIR, 'static/'))
     shutil.copytree('static/', os.path.join(BUILD_DIR, 'static/'))
