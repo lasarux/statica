@@ -145,10 +145,11 @@ def main():
     res = Static()
     builtins = {}
     
+    # built-ins
     try:
-        import resources.settings as settings
-        builtins['google_analytics'] = google_analytics.render(analytics_id=settings.analytics_id)
-        builtins['google_maps'] = google_maps.render(zoom=settings.map_zoom, lat=settings.map_lat, lon=settings.map_lon, title=settings.map_title)
+        import settings as s
+        builtins['google_analytics'] = google_analytics.render(analytics_id=s.analytics_id)
+        builtins['google_maps'] = google_maps.render(zoom=s.map_zoom, lat=s.map_lat, lon=s.map_lon, title=s.map_title)
     except:
         print "Error"
            
@@ -170,7 +171,10 @@ def main():
                     output = template.render(css=res.css, js=res.js, img=res.img, ico=res.ico, **boxes)
                     codecs.open(os.path.join(BUILD_DIR, lang, 'index.html'), 'w', 'utf-8').write(output)
     
-    shutil.rmtree(os.path.join(BUILD_DIR, 'static/'))
+    try:
+        shutil.rmtree(os.path.join(BUILD_DIR, 'static/'))
+    except:
+        pass
     shutil.copytree('static/', os.path.join(BUILD_DIR, 'static/'))
 
 if __name__ == '__main__':
