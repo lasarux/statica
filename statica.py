@@ -10,20 +10,24 @@ __email__ = "pedro.gracia@impulzia.com"
 __status__ = "Development"
 
 import os
+import re
 import codecs
 from os.path import join, getsize
 import shutil
 import markdown
 from jinja2 import Environment, FileSystemLoader, Template
-
+from jinja2 import evalcontextfilter, contextfilter, Markup, escape
+from PIL import Image, ImageOps
 
 # initial constants
 RESOURCES_DIR = 'resources/'
+RESOURCES_IMG_DIR = os.path.join(RESOURCES_DIR, 'img')
 STATIC_DIR = 'static/'
 TEMPLATES_DIR = 'templates/'
 TEMPLATE_DEFAULT = 'main.html'
 BUILD_DIR = 'build/'
 LANGUAGES = ['ca', 'es']
+IMG_EXTENSION = ['jpg', 'jpeg', 'png', 'gif']
 #DEFAULT_LANGUAGE = 'ca'
 
 google_analytics = Template("""<script type="text/javascript">
@@ -59,11 +63,35 @@ google_maps = Template("""<script src="https://maps.googleapis.com/maps/api/js?s
   }
 </script>""")
 
+@evalcontextfilter
+def thumbnail(eval_ctx, value, width, height, style=""):
+    #result = do_something(value)
+    thumb = ImageOps.fit(value.image, (width, height), Image.ANTIALIAS)
+    path = os.path.join(BUILD_DIR, 'static', 'img', 'thumbnail', value.filename)
+    url = '../static/img/thumbnail/%s' % value.filename
+    
+    try:
+        os.makedirs(os.path.join(BUILD_DIR, 'static', 'img', 'thumbnail'))
+    except:
+        pass
+    thumb.save(path)
+    
+    if style:
+        result = '<img class="%s" src="%s" title="%s" alt="%s"/>' % (style, url, value.title, value.alt)
+    else:
+        result = '<img src="%s" title="%s" alt="%s"/>' % (url, value.title, value.alt)
+
+    if eval_ctx.autoescape:
+            result = Markup(result)
+    return result
+
 # initialize makdown object
 md = markdown.Markdown(safe_mode=False, extensions=['tables', 'superscript'])
 # initialize jinja2 objects
 env = Environment(loader=FileSystemLoader(TEMPLATES_DIR))
+env.filters['thumbnail'] = thumbnail
 template = env.get_template(TEMPLATE_DEFAULT)
+
 
 class Static:
     """Basic Object for css, js and images resources"""
@@ -87,6 +115,28 @@ class Static:
                 key = key.replace('-', '_').replace('.', '_')
                 r[key] = '../static/%s/%s' % (t, file)
 
+class Img:
+    def __init__(self, filename, image, title, alt):
+        self.filename = filename
+        self.image = image
+        self.title = title
+        self.alt = alt
+
+class Gallery:
+    """Image container"""
+    def __init__(self, root, dirs, files):
+        self.images = []
+        for file in files:
+            ext = file.split('.')[-1]
+            if ext.lower() in IMG_EXTENSION:
+                key = file[:-(len(ext)+1)]
+                image = Image.open(os.path.join(root, file))
+                img = Img(file, image, "", "")
+                self.images.append(img)
+                    
+    def parse_catalog(self):
+        pass
+    
 
 class Box:
     """Basic Page object"""
@@ -152,30 +202,48 @@ def main():
         builtins['google_maps'] = google_maps.render(zoom=s.map_zoom, lat=s.map_lat, lon=s.map_lon, title=s.map_title)
     except:
         print "Error"
-           
-    for root, dirs, files in os.walk(RESOURCES_DIR):
-        if root == RESOURCES_DIR:
-            # process resources for each languages
-            for lang in dirs:
-                for root, dirs, files in os.walk(os.path.join(RESOURCES_DIR, lang)):
-                    boxes = {}
-                    for file in files:
-                        #TODO: check extension (markdown, html, etc.)
-                        box = Box(join(root, file))
-                        key = file.split('.')[0]
-                        boxes[key] = box.parse()
 
-                    # write output file
-                    boxes['current_language'] = lang
-                    boxes['builtins'] = builtins
-                    output = template.render(css=res.css, js=res.js, img=res.img, ico=res.ico, **boxes)
-                    codecs.open(os.path.join(BUILD_DIR, lang, 'index.html'), 'w', 'utf-8').write(output)
-    
+    # copy static/ to build/static
     try:
         shutil.rmtree(os.path.join(BUILD_DIR, 'static/'))
     except:
         pass
+
     shutil.copytree('static/', os.path.join(BUILD_DIR, 'static/'))
+    
+    # process image galleries
+    galleries = {}
+    for dir in os.listdir(RESOURCES_IMG_DIR):
+        for root, dirs, files in os.walk(os.path.join(RESOURCES_IMG_DIR, dir)):
+            galleries[dir] = Gallery(root, dirs, files)
+           
+    # process markdown resources for each language
+    for lang in LANGUAGES:
+        for root, dirs, files in os.walk(os.path.join(RESOURCES_DIR, lang)):
+            boxes = {}
+            for file in files:
+                #TODO: check extension (markdown, html, etc.)
+                box = Box(join(root, file))
+                key = file.split('.')[0]
+                boxes[key] = box.parse()
+
+            # write output file
+            boxes['current_language'] = lang
+            boxes['builtins'] = builtins
+            
+            for key, value in galleries.items():
+                boxes[key].gallery = value 
+            
+            output = template.render(css=res.css, js=res.js, img=res.img, ico=res.ico, **boxes)
+            try:
+                os.makedirs(os.path.join(BUILD_DIR, lang))
+            except:
+                pass
+            
+            codecs.open(os.path.join(BUILD_DIR, lang, 'index.html'), 'w', 'utf-8').write(output)
+    
+
+
 
 if __name__ == '__main__':
     main()

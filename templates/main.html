@@ -1,7 +1,5 @@
 {% extends 'base.html' %}
 {% block content %}
-
-
   <!-- Main hero unit for a primary marketing message or call to action -->
   <div class="hero-unit">
   	<img style="float: left; margin-right: 30px;" alt="les ginestes logo" src="../static/img/lesginestes_logo.png" />
@@ -9,6 +7,7 @@
     <p><a class="btn btn-primary btn-large" data-toggle="modal" href="#moreInfo">{{ main_top.buttontext }}</a></p>
   </div>
   
+  <!-- BEGIN modal -->
   <div class="modal hide" id="moreInfo">
     <div class="modal-header">
       <button type="button" class="close" data-dismiss="modal">×</button>
@@ -39,19 +38,25 @@
   	  </form>
     </div>
   </div>
+  <!-- END modal -->
   
-  <!-- Main row of columns -->
+  <!-- BEGIN columns -->
   <div class="row">
+	
+	<!-- BEGIN main_left -->
     <div class="span4">
     	{{ main_left }}
-		<hr>
-		<h2>hey</h2>
-		<p>test</p>
   		<!-- <p><a class="btn" href="#">View details &raquo;</a></p> -->
   	</div>
+	<!-- END main_left -->
+
+	<!-- BEGIN main_middle -->
     <div class="span4">
 		{{ main_middle }}
 	</div>
+	<!-- END main_middle -->
+	
+	<!-- BEGIN main_right -->
 	<div class="well span4" style="width:27%">
 		{{ main_right }}
 		
@@ -80,16 +85,39 @@
 			</div>
 		</div>
 		<!-- END modal table -->
+		
 	</div>
+	<!-- END main_right -->
 	
+	<!-- BEGIN google map -->
 	<ul class="thumbnails">
 	  <li class="span4">
 	    <div class="thumbnail">
 	      <div id="map_canvas"></div>
-		  {{ main_map }}
+		  <p>{{ main_map }}</p>
 	    </div>
 	  </li>
 	</ul>
+	<!-- END google map -->
+
+
 	
   </div>
+  <!-- END columns -->
+	
+	<!-- BEGIN pictures -->
+	<hr>
+	<div class="row">
+		<div class="span12">
+			<ul class="thumbnails">
+			  {% for image in main.gallery.images %}
+			  <li class="span4">	
+		  	  	{{ image|thumbnail(370, 250, "img-polaroid") }}
+			  </li>
+			  {% endfor %}
+			</ul>	
+		</div>
+	</div>
+	<!-- END pictures -->
+
 {% endblock content %}
