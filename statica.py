@@ -121,6 +121,28 @@ class Img:
         self.image = image
         self.title = title
         self.alt = alt
+        self.url = '../static/img/%s' % self.filename
+        path = os.path.join(BUILD_DIR, 'static', 'img', self.filename)
+    
+        try:
+            os.makedirs(os.path.join(BUILD_DIR, 'static', 'img'))
+        except:
+            pass
+        self.image.save(path)
+
+    def __repr__(self):
+        return '<img src="%s" title="%s" alt="%s" />' % (self.url, self.title, self.alt)
+
+class Resource:
+    def __init__(self):
+        pass
+    
+    def addfile(self, filename, path, title, alt):
+        # TODO: autodiscover type
+        name = '_'.join(filename.lower().split('.')[:-1])
+        image = Image.open(path)
+        img = Img(filename, image, "", "")
+        setattr(self, name, img)
 
 class Gallery:
     """Image container"""
@@ -216,6 +238,14 @@ def main():
     for dir in os.listdir(RESOURCES_IMG_DIR):
         for root, dirs, files in os.walk(os.path.join(RESOURCES_IMG_DIR, dir)):
             galleries[dir] = Gallery(root, dirs, files)
+    
+    # process images
+    res_obj = Resource()
+    for file in os.listdir(RESOURCES_IMG_DIR):
+        ext = file.split('.')[-1]
+        if ext.lower() in IMG_EXTENSION:
+            res_obj.addfile(file, os.path.join(RESOURCES_IMG_DIR, file), "", "")
+    
            
     # process markdown resources for each language
     for lang in LANGUAGES:
@@ -230,17 +260,21 @@ def main():
             # write output file
             boxes['current_language'] = lang
             boxes['builtins'] = builtins
+            boxes['resource'] = res_obj
             
             for key, value in galleries.items():
                 boxes[key].gallery = value 
             
-            output = template.render(css=res.css, js=res.js, img=res.img, ico=res.ico, **boxes)
-            try:
-                os.makedirs(os.path.join(BUILD_DIR, lang))
-            except:
-                pass
+            for i, t in s.menu.items():
+                template = env.get_template('%s.html' % t)
+                output = template.render(css=res.css, js=res.js, img=res.img, ico=res.ico, **boxes)
+                try:
+                    os.makedirs(os.path.join(BUILD_DIR, lang))
+                except:
+                    pass
             
-            codecs.open(os.path.join(BUILD_DIR, lang, 'index.html'), 'w', 'utf-8').write(output)
+            
+                codecs.open(os.path.join(BUILD_DIR, lang, '%s.html' % i), 'w', 'utf-8').write(output)
     
 
 
