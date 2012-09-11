@@ -267,7 +267,13 @@ def main():
             
             for i, t in s.menu.items():
                 template = env.get_template('%s.html' % t)
-                output = template.render(css=res.css, js=res.js, img=res.img, ico=res.ico, **boxes)
+                output_md = template.render(css=res.css, js=res.js, img=res.img, ico=res.ico, **boxes)
+                # second pass to use template engine within markdown output
+                env_md = Environment()
+                env_md.filters['thumbnail'] = thumbnail
+                template_md = env_md.from_string(output_md)
+                output = template_md.render(css=res.css, js=res.js, img=res.img, ico=res.ico, **boxes)
+                
                 try:
                     os.makedirs(os.path.join(BUILD_DIR, lang))
                 except:

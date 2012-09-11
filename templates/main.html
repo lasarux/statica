@@ -4,7 +4,12 @@
   <div class="hero-unit">
   	<img style="float: left; margin-right: 30px;" alt="les ginestes logo" src="{{ resource.lesginestes_logo.url }}" />
     {{ main_top }}
-    <p><a class="btn btn-primary btn-large" data-toggle="modal" href="#moreInfo">{{ main_top.buttontext }}</a></p>
+    <p>
+		<a class="btn btn-primary btn-large" data-toggle="modal" href="#moreInfo">{{ main_top.buttontext }}</a>
+		<a class="btn btn-primary btn-large" data-toggle="modal" href="#plaInfo">
+		    <i class="icon-info-sign icon-white"></i> {{ main_right.button }}
+	    </a>
+	</p>
   </div>
   
   <!-- BEGIN modal -->
@@ -66,11 +71,7 @@
 			<div style="width:{{ main_right.done}}%;" class="bar bar-success"></div>
 			<div style="width:{{ main_right.progress }}%;" class="bar bar-warning"></div>
 		</div>
-		<p>
-			<a class="btn" data-toggle="modal" href="#plaInfo">
-			    <i class="icon-info-sign"></i> {{ main_right.button }}
-		    </a>
-		</p>
+
 		<br>
 		<!-- END progress bar -->
 		
@@ -88,6 +89,10 @@
 		
 	</div>
 	<!-- END main_right -->
+	
+	<div style="margin-bottom: 20px;" class="span4">
+		{{ resource.file0167|thumbnail(360, 250, "img-polaroid") }}
+	</div>
 	
 	<!-- BEGIN google map -->
 	<ul class="thumbnails">
@@ -112,7 +117,7 @@
 			<ul class="thumbnails">
 			  {% for image in main.gallery.images %}
 			  <li class="span4">	
-		  	  	{{ image|thumbnail(370, 250, "img-polaroid") }}
+		  	  	{{ image|thumbnail(360, 250, "img-polaroid") }}
 			  </li>
 			  {% endfor %}
 			</ul>	
