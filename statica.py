@@ -29,6 +29,7 @@ BUILD_DIR = 'build/'
 LANGUAGES = ['ca', 'es']
 IMG_EXTENSION = ['jpg', 'jpeg', 'png', 'gif']
 #DEFAULT_LANGUAGE = 'ca'
+CACHE = {} # TODO: use cache with pickle to persistence
 
 google_analytics = Template("""<script type="text/javascript">
 
@@ -249,23 +250,24 @@ def main():
            
     # process markdown resources for each language
     for lang in LANGUAGES:
-        for root, dirs, files in os.walk(os.path.join(RESOURCES_DIR, lang)):
-            boxes = {}
-            for file in files:
-                #TODO: check extension (markdown, html, etc.)
-                box = Box(join(root, file))
-                key = file.split('.')[0]
-                boxes[key] = box.parse()
+        for m in s.menu:
+            t = s.menu[m] #template
+            for root, dirs, files in os.walk(os.path.join(RESOURCES_DIR, lang, m)):
+                boxes = {}
+                for file in files:
+                    #TODO: check extension (markdown, html, etc.)
+                    box = Box(join(root, file))
+                    key = file.split('.')[0]
+                    boxes[key] = box.parse()
 
-            # write output file
-            boxes['current_language'] = lang
-            boxes['builtins'] = builtins
-            boxes['resource'] = res_obj
+                # write output file
+                boxes['current_language'] = lang
+                boxes['builtins'] = builtins
+                boxes['resource'] = res_obj
             
-            for key, value in galleries.items():
-                boxes[key].gallery = value 
+                for key, value in galleries.items():
+                    boxes[key].gallery = value 
             
-            for i, t in s.menu.items():
                 template = env.get_template('%s.html' % t)
                 output_md = template.render(css=res.css, js=res.js, img=res.img, ico=res.ico, **boxes)
                 # second pass to use template engine within markdown output
@@ -279,10 +281,7 @@ def main():
                 except:
                     pass
             
-            
-                codecs.open(os.path.join(BUILD_DIR, lang, '%s.html' % i), 'w', 'utf-8').write(output)
-    
-
+                codecs.open(os.path.join(BUILD_DIR, lang, '%s.html' % m), 'w', 'utf-8').write(output)
 
 
 if __name__ == '__main__':

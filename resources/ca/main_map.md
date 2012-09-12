@@ -1,1 +1,0 @@
-A Viladecavalls estarà situada la Residència Geriàtrica i Centre de Dia "Els Ginestes".
