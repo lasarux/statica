@@ -12,12 +12,15 @@ __status__ = "Development"
 import os
 import re
 import codecs
+import pickle
+import md5
 from os.path import join, getsize
 import shutil
 import markdown
 from jinja2 import Environment, FileSystemLoader, Template
 from jinja2 import evalcontextfilter, contextfilter, Markup, escape
 from PIL import Image, ImageOps
+import settings as s
 
 # initial constants
 RESOURCES_DIR = 'resources/'
@@ -29,7 +32,6 @@ BUILD_DIR = 'build/'
 LANGUAGES = ['ca', 'es']
 IMG_EXTENSION = ['jpg', 'jpeg', 'png', 'gif']
 #DEFAULT_LANGUAGE = 'ca'
-CACHE = {} # TODO: use cache with pickle to persistence
 
 google_analytics = Template("""<script type="text/javascript">
 
@@ -63,6 +65,12 @@ google_maps = Template("""<script src="https://maps.googleapis.com/maps/api/js?s
     });
   }
 </script>""")
+
+def get_cache(filename):
+    if os.path.exists(filename):
+        CACHE = pickle.load(filename)
+    else:
+        CACHE = {}
 
 @evalcontextfilter
 def thumbnail(eval_ctx, value, width, height, style=""):
@@ -145,6 +153,7 @@ class Resource:
         img = Img(filename, image, "", "")
         setattr(self, name, img)
 
+
 class Gallery:
     """Image container"""
     def __init__(self, root, dirs, files):
@@ -168,6 +177,8 @@ class Box:
         self.lines = codecs.open(filename, "r", "utf-8").readlines()
         self.md = ""
         self.html = ""
+        
+        self.parse()
 
     def __str__(self):
         return self.html or self.md or "Empty, please fill it"
@@ -203,18 +214,23 @@ class Box:
                     continue
                 # add attribute to this object
                 attr = data[0]
-                try:
-                    # to eval a string is cool! (maths are welcome)
-                    value = eval(line[len(attr)+1:].strip())
-                except:
-                    value = line[len(attr)+1:].strip()
+                data = line[len(attr)+1:].strip()
+                if data != 'main':
+                    try:
+                        # to eval a string is cool! (maths are welcome)
+                        value = eval(data)
+                    except:
+                        value = data
+                else:
+                    value = data
                 setattr(self, attr, value)
         self.get_html() 
-        return self
+
         
 
 def main():
     # main function
+    CACHE = get_cache('.cache')
     res = Static()
     builtins = {}
     
@@ -247,28 +263,47 @@ def main():
         if ext.lower() in IMG_EXTENSION:
             res_obj.addfile(file, os.path.join(RESOURCES_IMG_DIR, file), "", "")
     
-           
-    # process markdown resources for each language
+    
+    # process menu files
+    pages = {}
     for lang in LANGUAGES:
-        for m in s.menu:
-            t = s.menu[m] #template
-            for root, dirs, files in os.walk(os.path.join(RESOURCES_DIR, lang, m)):
+        for root, dirs, files in os.walk(os.path.join(RESOURCES_DIR, lang)):
+            if 'page.md' in files:
+                name = root.split('/')[-1]
+                m = Box(os.path.join(root, 'page.md'))
+                m.dir = root
+                m.path = os.path.join(BUILD_DIR, lang, '%s.html' % name)
+                m.lang = lang
+                m.url = '%s/%s.html' % (lang, name) 
+                if pages.has_key(lang):
+                    pages[lang].append(m)
+                else:
+                    pages[lang]=[m]
+
+    # process markdown resources for each language
+    for l, p in pages.items():
+        for m in p:
+            t = '%s.html' % m.template #template
+            for root, dirs, files in os.walk(m.dir):
                 boxes = {}
                 for file in files:
                     #TODO: check extension (markdown, html, etc.)
                     box = Box(join(root, file))
                     key = file.split('.')[0]
-                    boxes[key] = box.parse()
+                    boxes[key] = box
 
                 # write output file
-                boxes['current_language'] = lang
+                boxes['current_language'] = m.lang
                 boxes['builtins'] = builtins
                 boxes['resource'] = res_obj
+                boxes['page'] = m #TODO: better not in boxes?
+                boxes['gallery'] = {}
             
+                # gallery items
                 for key, value in galleries.items():
-                    boxes[key].gallery = value 
+                    boxes['gallery'][key] = value 
             
-                template = env.get_template('%s.html' % t)
+                template = env.get_template('%s' % t)
                 output_md = template.render(css=res.css, js=res.js, img=res.img, ico=res.ico, **boxes)
                 # second pass to use template engine within markdown output
                 env_md = Environment()
@@ -277,11 +312,11 @@ def main():
                 output = template_md.render(css=res.css, js=res.js, img=res.img, ico=res.ico, **boxes)
                 
                 try:
-                    os.makedirs(os.path.join(BUILD_DIR, lang))
+                    os.makedirs(os.path.join(BUILD_DIR, m.lang))
                 except:
                     pass
-            
-                codecs.open(os.path.join(BUILD_DIR, lang, '%s.html' % m), 'w', 'utf-8').write(output)
+
+                codecs.open(m.path, 'w', 'utf-8').write(output)
 
 
 if __name__ == '__main__':
