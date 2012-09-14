@@ -29,7 +29,6 @@ STATIC_DIR = 'static/'
 TEMPLATES_DIR = 'templates/'
 TEMPLATE_DEFAULT = 'main.html'
 BUILD_DIR = 'build/'
-LANGUAGES = ['ca', 'es']
 IMG_EXTENSION = ['jpg', 'jpeg', 'png', 'gif']
 #DEFAULT_LANGUAGE = 'ca'
 
@@ -226,8 +225,6 @@ class Box:
                 setattr(self, attr, value)
         self.get_html() 
 
-        
-
 def main():
     # main function
     CACHE = get_cache('.cache')
@@ -266,23 +263,25 @@ def main():
     
     # process menu files
     pages = {}
-    for lang in LANGUAGES:
-        for root, dirs, files in os.walk(os.path.join(RESOURCES_DIR, lang)):
+    for lang in s.LANGUAGES:
+        pages[lang[0]] = {}
+        for root, dirs, files in os.walk(os.path.join(RESOURCES_DIR, lang[0])):
             if 'page.md' in files:
-                name = root.split('/')[-1]
                 m = Box(os.path.join(root, 'page.md'))
+                m.name = root.split('/')[-1]
                 m.dir = root
-                m.path = os.path.join(BUILD_DIR, lang, '%s.html' % name)
-                m.lang = lang
-                m.url = '%s/%s.html' % (lang, name) 
-                if pages.has_key(lang):
-                    pages[lang].append(m)
-                else:
-                    pages[lang]=[m]
+                m.path = os.path.join(BUILD_DIR, lang[0], '%s.html' % m.name)
+                m.lang = lang[0]
+                m.slang = lang[1]
+                m.url = '%s/%s.html' % (lang[0], m.name) 
+                m.surl = '../%s/%s.html' % (lang[0], m.name)
+                pages[lang[0]][m.name] = m
+
+
 
     # process markdown resources for each language
     for l, p in pages.items():
-        for m in p:
+        for m in p.values():
             t = '%s.html' % m.template #template
             for root, dirs, files in os.walk(m.dir):
                 boxes = {}
@@ -291,13 +290,18 @@ def main():
                     box = Box(join(root, file))
                     key = file.split('.')[0]
                     boxes[key] = box
-
+                
+                lang_pages = []
+                for k, v in pages.items():
+                    lang_pages.append(v[m.name])
+                        
                 # write output file
                 boxes['current_language'] = m.lang
                 boxes['builtins'] = builtins
                 boxes['resource'] = res_obj
                 boxes['page'] = m #TODO: better not in boxes?
                 boxes['gallery'] = {}
+                boxes['lang_pages'] = lang_pages
             
                 # gallery items
                 for key, value in galleries.items():
