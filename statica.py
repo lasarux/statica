@@ -21,6 +21,7 @@ from jinja2 import Environment, FileSystemLoader, Template
 from jinja2 import evalcontextfilter, contextfilter, Markup, escape
 from PIL import Image, ImageOps
 import settings as s
+import jinja2.exceptions
 
 # initial constants
 RESOURCES_DIR = 'resources/'
@@ -30,7 +31,9 @@ TEMPLATES_DIR = 'templates/'
 TEMPLATE_DEFAULT = 'main.html'
 BUILD_DIR = 'build/'
 IMG_EXTENSION = ['jpg', 'jpeg', 'png', 'gif']
+SLOT_EMPTY = 'SLOT EMPTY - PLEASE FILL IN'
 #DEFAULT_LANGUAGE = 'ca'
+#templates = {}
 
 google_analytics = Template("""<script type="text/javascript">
 
@@ -261,29 +264,40 @@ def main():
             res_obj.addfile(file, os.path.join(RESOURCES_IMG_DIR, file), "", "")
     
     
-    # process menu files
+    # process page files
     pages = {}
     for lang in s.LANGUAGES:
         pages[lang[0]] = {}
         for root, dirs, files in os.walk(os.path.join(RESOURCES_DIR, lang[0])):
+            # only scan dirs with a page.md file
             if 'page.md' in files:
                 m = Box(os.path.join(root, 'page.md'))
-                m.name = root.split('/')[-1]
-                m.dir = root
-                m.path = os.path.join(BUILD_DIR, lang[0], '%s.html' % m.name)
+                xelements = root.split("/")[2:]
+                xdir = "/".join(xelements)
+                m.root = root
+                #TODO: unify url and surl
+                if xelements[-1] != 'index':
+                    m.path = os.path.join(lang[0], xdir, 'index.html')
+                    m.dir = os.path.join(lang[0], xdir)
+                    m.name  ='index'
+                    m.url = '%s/%s/%s.html' % (lang[0], xdir, 'index')
+                    m.surl = '../%s/%s/%s.html' % (lang[0], xdir, 'index')
+                else:
+                    m.name = root.split('/')[-1]
+                    m.path = os.path.join(lang[0], '%s.html' % m.name)
+                    m.dir = os.path.join(lang[0])
+                    m.url = '%s/%s.html' % (lang[0], m.name)
+                    m.surl = '../%s/%s.html' % (lang[0], m.name)
                 m.lang = lang[0]
-                m.slang = lang[1]
-                m.url = '%s/%s.html' % (lang[0], m.name) 
-                m.surl = '../%s/%s.html' % (lang[0], m.name)
-                pages[lang[0]][m.name] = m
-
-
+                m.slang = lang[1]       
+                pages[lang[0]][m.dir] = m
 
     # process markdown resources for each language
     for l, p in pages.items():
         for m in p.values():
             t = '%s.html' % m.template #template
-            for root, dirs, files in os.walk(m.dir):
+            print m.root
+            for root, dirs, files in os.walk(m.root):
                 boxes = {}
                 for file in files:
                     #TODO: check extension (markdown, html, etc.)
@@ -291,9 +305,13 @@ def main():
                     key = file.split('.')[0]
                     boxes[key] = box
                 
+                # get each page with same name
                 lang_pages = []
                 for k, v in pages.items():
-                    lang_pages.append(v[m.name])
+                    try:
+                        lang_pages.append(v[m.name])
+                    except KeyError:
+                        print "Warning: missing info for a language: %s" % m.dir
                         
                 # write output file
                 boxes['current_language'] = m.lang
@@ -308,7 +326,12 @@ def main():
                     boxes['gallery'][key] = value 
             
                 template = env.get_template('%s' % t)
-                output_md = template.render(css=res.css, js=res.js, img=res.img, ico=res.ico, **boxes)
+                try:
+                    output_md = template.render(
+                        css=res.css, js=res.js, img=res.img, ico=res.ico, **boxes)
+                except jinja2.exceptions.UndefinedError:
+                    print "Warning, slot empty at %s" % m.name
+                    output_md = SLOT_EMPTY
                 # second pass to use template engine within markdown output
                 env_md = Environment()
                 env_md.filters['thumbnail'] = thumbnail
@@ -316,11 +339,11 @@ def main():
                 output = template_md.render(css=res.css, js=res.js, img=res.img, ico=res.ico, **boxes)
                 
                 try:
-                    os.makedirs(os.path.join(BUILD_DIR, m.lang))
+                    print "creating directory %s" % os.path.join(BUILD_DIR, m.dir)
+                    os.makedirs(os.path.join(BUILD_DIR, m.dir))
                 except:
                     pass
-
-                codecs.open(m.path, 'w', 'utf-8').write(output)
+                codecs.open(os.path.join(BUILD_DIR, m.path), 'w', 'utf-8').write(output)
 
 
 if __name__ == '__main__':
