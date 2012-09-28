@@ -1,6 +1,6 @@
 ##El projecte
 
-Es tracta d’efectuar l’explotació d’un edifici amb 13 habitacions dobles i una senzilla i serveis comuns de menjador, sala d’estar, de Tv, gimnàs, aules, etc. No obstant, cada habitació disposarà de Tv i telèfon en la habitación. Per a gent gran o no però que requereixi d'una vigilància i/o control acceptat per part del resident.
+Es tracta d’efectuar l’explotació d’un edifici amb 13 habitacions dobles i una senzilla i serveis comuns de menjador, sala d’estar, de TV, gimnàs, aules, etc. No obstant, cada habitació disposarà de TV i telèfon en la habitación. Per a gent gran o no però que requereixi d'una vigilància i/o control acceptat per part del resident.
 
 Tan mateix, també disposarem d’ un Centre de Dia amb capacitat per a 30 persones.
 

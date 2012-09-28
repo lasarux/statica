@@ -4,12 +4,13 @@ __author__ = "Pedro Gracia"
 __copyright__ = "Copyright 2012, Impulzia S.L."
 __credits__ = ["Pedro Gracia"]
 __license__ = "BSD"
-__version__ = "0.4"
+__version__ = "0.5"
 __maintainer__ = "Pedro Gracia"
 __email__ = "pedro.gracia@impulzia.com"
 __status__ = "Development"
 
 import os
+import sys
 import re
 import codecs
 import pickle
@@ -20,59 +21,23 @@ import markdown
 from jinja2 import Environment, FileSystemLoader, Template
 from jinja2 import evalcontextfilter, contextfilter, Markup, escape
 from PIL import Image, ImageOps
-import settings as s
-import jinja2.exceptions
+import jinja2.exceptions 
 
-# initial constants
-RESOURCES_DIR = 'resources/'
-RESOURCES_IMG_DIR = os.path.join(RESOURCES_DIR, 'img')
-STATIC_DIR = 'static/'
-TEMPLATES_DIR = 'templates/'
-TEMPLATE_DEFAULT = 'main.html'
 BUILD_DIR = 'build/'
 IMG_EXTENSION = ['jpg', 'jpeg', 'png', 'gif']
 SLOT_EMPTY = 'SLOT EMPTY - PLEASE FILL IN'
-#DEFAULT_LANGUAGE = 'ca'
-#templates = {}
 
-google_analytics = Template("""<script type="text/javascript">
-
-    var _gaq = _gaq || [];
-    _gaq.push(['_setAccount', '{{ analytics_id }}']);
-    _gaq.push(['_trackPageview']);
-
-    (function() {
-      var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
-      ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
-      var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
-    })();
-
-  </script>""")
-  
-google_maps = Template("""<script src="https://maps.googleapis.com/maps/api/js?sensor=false"></script>
-<script>
-  function initialize() {
-    var myLatlng = new google.maps.LatLng({{ lat }}, {{ lon }});
-    var mapOptions = {
-      zoom: {{ zoom }},
-      center: myLatlng,
-      mapTypeId: google.maps.MapTypeId.ROADMAP
-    }
-    var map = new google.maps.Map(document.getElementById('map_canvas'), mapOptions);
-
-    var marker = new google.maps.Marker({
-        position: myLatlng,
-        map: map,
-        title: '{{ title }}'
-    });
-  }
-</script>""")
+# initialize makdown object
+md = markdown.Markdown(safe_mode=False, extensions=['tables', 'superscript'])
 
 def get_cache(filename):
     if os.path.exists(filename):
         CACHE = pickle.load(filename)
     else:
         CACHE = {}
+
+def normalize(name):
+    return name.lower().replace("-", "_").replace(".", "_")
 
 @evalcontextfilter
 def thumbnail(eval_ctx, value, width, height, style=""):
@@ -96,29 +61,22 @@ def thumbnail(eval_ctx, value, width, height, style=""):
             result = Markup(result)
     return result
 
-# initialize makdown object
-md = markdown.Markdown(safe_mode=False, extensions=['tables', 'superscript'])
-# initialize jinja2 objects
-env = Environment(loader=FileSystemLoader(TEMPLATES_DIR))
-env.filters['thumbnail'] = thumbnail
-template = env.get_template(TEMPLATE_DEFAULT)
-
 
 class Static:
     """Basic Object for css, js and images resources"""
-    def __init__(self):
+    def __init__(self, path):
         self.css = {}
         self.js = {}
         self.img = {}
         self.ico = {}
-        self.include('css')
-        self.include('js')
-        self.include('img')
-        self.include('ico')
+        self.include(path, 'css')
+        self.include(path, 'js')
+        self.include(path, 'img')
+        self.include(path, 'ico')
         
-    def include(self, t):
+    def include(self, path, t):
         """walk throught static dirs to get files"""
-        for root, dirs, files in os.walk(os.path.join(STATIC_DIR, t)):
+        for root, dirs, files in os.walk(os.path.join(path, t)):
             for file in files:
                 key_split = file.split('.')
                 key = '.'.join(key_split[:-1])
@@ -126,15 +84,50 @@ class Static:
                 key = key.replace('-', '_').replace('.', '_')
                 r[key] = '../static/%s/%s' % (t, file)
 
+
+class Item:
+    def __init__(self, root, parent=None):
+        self.parent = parent
+        self.root = root
+        self.children = []
+        
+        self.discover(root)
+        
+    def __unicode__(self):
+        print self.root
+
+    def add_value(self, name, value):
+        setattr(self, normalize(name), value)
+        
+    def add_child(self, name, item):
+        self.add_value(name, item)
+        self.children.append(item)
+
+    def discover(self, root):
+        items = os.listdir(root)
+        for item in items:            
+            path = os.path.join(root, item)
+            if os.path.isdir(path):
+                self.add_child(item, Item(path, self))
+            else:
+                ext = item.split('.')[-1]
+                if ext.lower() in IMG_EXTENSION:
+                    name = item[:-(len(ext)+1)]
+                    self.add_value(name, Img(item, path))
+                else:
+                    self.add_value(item, path)
+        return self
+
+
 class Img:
-    def __init__(self, filename, image, title, alt):
+    def __init__(self, filename, path, title="", alt=""):
         self.filename = filename
-        self.image = image
+        self.image = Image.open(path)
         self.title = title
         self.alt = alt
         self.url = '../static/img/%s' % self.filename
         path = os.path.join(BUILD_DIR, 'static', 'img', self.filename)
-    
+
         try:
             os.makedirs(os.path.join(BUILD_DIR, 'static', 'img'))
         except:
@@ -145,14 +138,14 @@ class Img:
         return '<img src="%s" title="%s" alt="%s" />' % (self.url, self.title, self.alt)
 
 class Resource:
+    #TODO: review this and use Item
     def __init__(self):
         pass
     
     def addfile(self, filename, path, title, alt):
         # TODO: autodiscover type
         name = '_'.join(filename.lower().split('.')[:-1])
-        image = Image.open(path)
-        img = Img(filename, image, "", "")
+        img = Img(filename, path, "", "")
         setattr(self, name, img)
 
 
@@ -164,8 +157,7 @@ class Gallery:
             ext = file.split('.')[-1]
             if ext.lower() in IMG_EXTENSION:
                 key = file[:-(len(ext)+1)]
-                image = Image.open(os.path.join(root, file))
-                img = Img(file, image, "", "")
+                img = Img(file, os.path.join(root, file), "", "")
                 self.images.append(img)
                     
     def parse_catalog(self):
@@ -228,19 +220,68 @@ class Box:
                 setattr(self, attr, value)
         self.get_html() 
 
-def main():
+def main(project_path):
     # main function
-    CACHE = get_cache('.cache')
-    res = Static()
+    #CACHE = get_cache('.cache')
+    
+    # initial constants
+    PROJECT_DIR = project_path
+    RESOURCES_DIR = os.path.join(PROJECT_DIR, 'resources/')
+    RESOURCES_IMG_DIR = os.path.join(RESOURCES_DIR, 'img')
+    STATIC_DIR = os.path.join(PROJECT_DIR, 'static/')
+    TEMPLATES_DIR = os.path.join(PROJECT_DIR, 'templates/')
+    TEMPLATE_DEFAULT = 'main.html'
+    #DEFAULT_LANGUAGE = 'ca'
+    #templates = {}
+
+    exec("import %s as s" % PROJECT_DIR)
+
+    google_analytics = Template("""<script type="text/javascript">
+
+        var _gaq = _gaq || [];
+        _gaq.push(['_setAccount', '{{ analytics_id }}']);
+        _gaq.push(['_trackPageview']);
+
+        (function() {
+          var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+          ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+          var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+        })();
+
+      </script>""")
+  
+    google_maps = Template("""<script src="https://maps.googleapis.com/maps/api/js?sensor=false"></script>
+    <script>
+      function initialize() {
+        var myLatlng = new google.maps.LatLng({{ lat }}, {{ lon }});
+        var mapOptions = {
+          zoom: {{ zoom }},
+          center: myLatlng,
+          mapTypeId: google.maps.MapTypeId.ROADMAP
+        }
+        var map = new google.maps.Map(document.getElementById('map_canvas'), mapOptions);
+
+        var marker = new google.maps.Marker({
+            position: myLatlng,
+            map: map,
+            title: '{{ title }}'
+        });
+      }
+    </script>""")
+    
+    # initialize jinja2 objects
+    env = Environment(loader=FileSystemLoader(TEMPLATES_DIR))
+    env.filters['thumbnail'] = thumbnail
+    #template = env.get_template(TEMPLATE_DEFAULT)
+    res = Static(STATIC_DIR)
     builtins = {}
     
     # built-ins
     try:
-        import settings as s
         builtins['google_analytics'] = google_analytics.render(analytics_id=s.analytics_id)
         builtins['google_maps'] = google_maps.render(zoom=s.map_zoom, lat=s.map_lat, lon=s.map_lon, title=s.map_title)
     except:
-        print "Error"
+        print "Warning! There isn't information about Google services"
 
     # copy static/ to build/static
     try:
@@ -248,21 +289,23 @@ def main():
     except:
         pass
 
-    shutil.copytree('static/', os.path.join(BUILD_DIR, 'static/'))
+    shutil.copytree(STATIC_DIR, os.path.join(BUILD_DIR, 'static/'))
     
+    # TODO: images are optional
     # process image galleries
+    # TODO: remove this and use Item
     galleries = {}
     for dir in os.listdir(RESOURCES_IMG_DIR):
         for root, dirs, files in os.walk(os.path.join(RESOURCES_IMG_DIR, dir)):
             galleries[dir] = Gallery(root, dirs, files)
     
     # process images
+    # TODO: remove this and use Item
     res_obj = Resource()
     for file in os.listdir(RESOURCES_IMG_DIR):
         ext = file.split('.')[-1]
         if ext.lower() in IMG_EXTENSION:
             res_obj.addfile(file, os.path.join(RESOURCES_IMG_DIR, file), "", "")
-    
     
     # process page files
     pages = {}
@@ -272,7 +315,7 @@ def main():
             # only scan dirs with a page.md file
             if 'page.md' in files:
                 m = Box(os.path.join(root, 'page.md'))
-                xelements = root.split("/")[2:]
+                xelements = root.split("/")[3:]
                 xdir = "/".join(xelements)
                 m.root = root
                 #TODO: unify url and surl
@@ -289,14 +332,15 @@ def main():
                     m.url = '%s/%s.html' % (lang[0], m.name)
                     m.surl = '../%s/%s.html' % (lang[0], m.name)
                 m.lang = lang[0]
-                m.slang = lang[1]       
-                pages[lang[0]][m.dir] = m
+                m.slang = lang[1]     
+                pages[lang[0]][xdir] = m
+
+    resources_img = Item(os.path.join(RESOURCES_DIR, 'img'))
 
     # process markdown resources for each language
     for l, p in pages.items():
         for m in p.values():
             t = '%s.html' % m.template #template
-            print m.root
             for root, dirs, files in os.walk(m.root):
                 boxes = {}
                 for file in files:
@@ -311,7 +355,7 @@ def main():
                     try:
                         lang_pages.append(v[m.name])
                     except KeyError:
-                        print "Warning: missing info for a language: %s" % m.dir
+                        print "Warning: missing info for '%s' language." % m.dir
                         
                 # write output file
                 boxes['current_language'] = m.lang
@@ -319,6 +363,7 @@ def main():
                 boxes['resource'] = res_obj
                 boxes['page'] = m #TODO: better not in boxes?
                 boxes['gallery'] = {}
+                boxes['image'] = resources_img
                 boxes['lang_pages'] = lang_pages
             
                 # gallery items
@@ -336,7 +381,8 @@ def main():
                 env_md = Environment()
                 env_md.filters['thumbnail'] = thumbnail
                 template_md = env_md.from_string(output_md)
-                output = template_md.render(css=res.css, js=res.js, img=res.img, ico=res.ico, **boxes)
+                output = template_md.render(
+                    css=res.css, js=res.js, img=res.img, ico=res.ico, **boxes)
                 
                 try:
                     print "creating directory %s" % os.path.join(BUILD_DIR, m.dir)
@@ -345,6 +391,7 @@ def main():
                     pass
                 codecs.open(os.path.join(BUILD_DIR, m.path), 'w', 'utf-8').write(output)
 
-
 if __name__ == '__main__':
-    main()
+    if len(sys.argv) != 2:
+        sys.exit('Usage: %s path/to/project' % sys.argv[0])
+    main(sys.argv[1])

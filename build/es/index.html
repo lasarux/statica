@@ -25,43 +25,42 @@
   <link rel="apple-touch-icon-precomposed" href="../static/ico/apple-touch-icon-57-precomposed.png">
   <script type="text/javascript">
 
-    var _gaq = _gaq || [];
-    _gaq.push(['_setAccount', 'UA-19757644-3']);
-    _gaq.push(['_trackPageview']);
+        var _gaq = _gaq || [];
+        _gaq.push(['_setAccount', 'UA-19757644-3']);
+        _gaq.push(['_trackPageview']);
 
-    (function() {
-      var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
-      ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
-      var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
-    })();
+        (function() {
+          var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+          ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+          var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+        })();
 
-  </script>
+      </script>
   <script src="https://maps.googleapis.com/maps/api/js?sensor=false"></script>
-<script>
-  function initialize() {
-    var myLatlng = new google.maps.LatLng(41.547087, 1.944162);
-    var mapOptions = {
-      zoom: 11,
-      center: myLatlng,
-      mapTypeId: google.maps.MapTypeId.ROADMAP
-    }
-    var map = new google.maps.Map(document.getElementById('map_canvas'), mapOptions);
+    <script>
+      function initialize() {
+        var myLatlng = new google.maps.LatLng(41.547087, 1.944162);
+        var mapOptions = {
+          zoom: 11,
+          center: myLatlng,
+          mapTypeId: google.maps.MapTypeId.ROADMAP
+        }
+        var map = new google.maps.Map(document.getElementById('map_canvas'), mapOptions);
 
-    var marker = new google.maps.Marker({
-        position: myLatlng,
-        map: map,
-        title: 'Residencia Les Ginestes'
-    });
-  }
-</script>
+        var marker = new google.maps.Marker({
+            position: myLatlng,
+            map: map,
+            title: 'Residencia Les Ginestes'
+        });
+      }
+    </script>
 </head>
 <body onload="initialize()">
 <div class="btn-toolbar choose-lang">
   <div class="btn-group">
     <button class="btn btn-mini btn-success">Idioma</button>
     <button class="btn btn-mini dropdown-toggle btn-success" data-toggle="dropdown"><span class="caret"></span></button>
-	[<__main__.Box instance at 0x1047d2bd8>, <__main__.Box instance at 0x1047d2c20>]
-<ul class="dropdown-menu pull-right">
+	<ul class="dropdown-menu pull-right">
   
   <li><a href="../ca/index.html">Catala</a></li>
   
@@ -125,7 +124,7 @@
 	<!-- BEGIN main_left -->
     <div class="span4">
     	<h2>El proyecto</h2><br>
-<p>Se trata de efectuar la explotación de un edificio con 13 habitaciones dobles y una sencilla, y servicios comunes de comedor, sala de estar, de TV, gimnasio, aulas, etc. No obstante, cada habitación dispondrá de TV ey teléfono en la habitación. Para gente mayor, o noy pero que requiere de una vigilancia y/o control aceptado por parte del residente.</p>
+<p>Se trata de efectuar la explotación de un edificio con 13 habitaciones dobles y una sencilla, y servicios comunes de comedor, sala de estar, de TV, gimnasio, aulas, etc. No obstante, cada habitación dispondrá de TV y teléfono en la habitación. Para gente mayor, o noy pero que requiere de una vigilancia y/o control aceptado por parte del residente.</p>
 <p>Asimismo, también dispondremos de un Centro de Día con capacidad para 30 persones.</p>
 <p>Se trata de un servicio de asistencia, de control i de vigilancia las 24 horas, 7 días a la semana para los residentes, y de 8h a 20h, de lunes a viernes no festivos, para los no residentes.</p>
 <p><img class="img-polaroid" src="../static/img/thumbnail/FILE0162.JPG" title="" alt=""/></p>

@@ -25,43 +25,42 @@
   <link rel="apple-touch-icon-precomposed" href="../static/ico/apple-touch-icon-57-precomposed.png">
   <script type="text/javascript">
 
-    var _gaq = _gaq || [];
-    _gaq.push(['_setAccount', 'UA-19757644-3']);
-    _gaq.push(['_trackPageview']);
+        var _gaq = _gaq || [];
+        _gaq.push(['_setAccount', 'UA-19757644-3']);
+        _gaq.push(['_trackPageview']);
 
-    (function() {
-      var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
-      ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
-      var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
-    })();
+        (function() {
+          var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+          ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+          var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+        })();
 
-  </script>
+      </script>
   <script src="https://maps.googleapis.com/maps/api/js?sensor=false"></script>
-<script>
-  function initialize() {
-    var myLatlng = new google.maps.LatLng(41.547087, 1.944162);
-    var mapOptions = {
-      zoom: 11,
-      center: myLatlng,
-      mapTypeId: google.maps.MapTypeId.ROADMAP
-    }
-    var map = new google.maps.Map(document.getElementById('map_canvas'), mapOptions);
+    <script>
+      function initialize() {
+        var myLatlng = new google.maps.LatLng(41.547087, 1.944162);
+        var mapOptions = {
+          zoom: 11,
+          center: myLatlng,
+          mapTypeId: google.maps.MapTypeId.ROADMAP
+        }
+        var map = new google.maps.Map(document.getElementById('map_canvas'), mapOptions);
 
-    var marker = new google.maps.Marker({
-        position: myLatlng,
-        map: map,
-        title: 'Residencia Les Ginestes'
-    });
-  }
-</script>
+        var marker = new google.maps.Marker({
+            position: myLatlng,
+            map: map,
+            title: 'Residencia Les Ginestes'
+        });
+      }
+    </script>
 </head>
 <body onload="initialize()">
 <div class="btn-toolbar choose-lang">
   <div class="btn-group">
     <button class="btn btn-mini btn-success">Idioma</button>
     <button class="btn btn-mini dropdown-toggle btn-success" data-toggle="dropdown"><span class="caret"></span></button>
-	[<__main__.Box instance at 0x1047d2bd8>, <__main__.Box instance at 0x1047d2c20>]
-<ul class="dropdown-menu pull-right">
+	<ul class="dropdown-menu pull-right">
   
   <li><a href="../ca/index.html">Catala</a></li>
   
@@ -127,7 +126,7 @@
 	<!-- BEGIN main_left -->
     <div class="span4">
     	<h2>El projecte</h2><br>
-<p>Es tracta d’efectuar l’explotació d’un edifici amb 13 habitacions dobles i una senzilla i serveis comuns de menjador, sala d’estar, de Tv, gimnàs, aules, etc. No obstant, cada habitació disposarà de Tv i telèfon en la habitación. Per a gent gran o no però que requereixi d'una vigilància i/o control acceptat per part del resident.</p>
+<p>Es tracta d’efectuar l’explotació d’un edifici amb 13 habitacions dobles i una senzilla i serveis comuns de menjador, sala d’estar, de TV, gimnàs, aules, etc. No obstant, cada habitació disposarà de TV i telèfon en la habitación. Per a gent gran o no però que requereixi d'una vigilància i/o control acceptat per part del resident.</p>
 <p>Tan mateix, també disposarem d’ un Centre de Dia amb capacitat per a 30 persones.</p>
 <p>Es tractarà d’ un servei d’ asistencia, de control i de vigilància les 24 hores 7 dies a la setmana pels residents i de 8 a 20 i de dilluns a divendres no festius pels no residents.</p>
 <p><img class="img-polaroid" src="../static/img/thumbnail/FILE0162.JPG" title="" alt=""/></p>
@@ -319,7 +318,7 @@
 	  <li class="span4">
 	    <div class="thumbnail">
 	      <div id="map_canvas"></div>
-		  <p><p>A Viladecavalls estarà situada la Residència Geriàtrica i Centre de Dia "Els Ginestes".</p></p>
+		  <p><p>A Viladecavalls estarà situada la Residència Geriàtrica i Centre de Dia "Les Ginestes".</p></p>
 	    </div>
 	  </li>
 	</ul>
