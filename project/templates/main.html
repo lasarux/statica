@@ -95,34 +95,54 @@
 	</div>
 	
 	<!-- BEGIN google map -->
-	<ul class="thumbnails">
-	  <li class="span4">
-	    <div class="thumbnail">
-	      <div id="map_canvas"></div>
-		  <p>{{ main_map }}</p>
-	    </div>
-	  </li>
-	</ul>
+	<div style="margin-bottom: 20px;" class="span4">
+		<ul class="thumbnails">
+		  <li>
+		    <div class="thumbnail">
+		      <div id="map_canvas"></div>
+			      {{ main_map }}
+		    </div>
+		  </li>
+		</ul>
+  </div>
 	<!-- END google map -->
 
-
+	<div style="margin-bottom: 20px;" class="span4">
+	{{ image.imagen008|thumbnail(360, 250, "img-polaroid") }}
+	</div>
 	
+
   </div>
   <!-- END columns -->
 	
-	<!-- BEGIN pictures -->
-	<hr>
+	<!-- BEGIN carousel -->
+	<hr class="clearfix">
+	
 	<div class="row">
-		<div class="span12">
-			<ul class="thumbnails">
-			  {% for image in gallery.index.images %}
-			  <li class="span4">	
-		  	  	{{ image|thumbnail(360, 250, "img-polaroid") }}
-			  </li>
-			  {% endfor %}
-			</ul>	
+		
+		<div class="span4">
+		{{ main_carousel }}
 		</div>
+	
+		<div class="span8">
+			<div id="myCarousel" class="carousel slide">
+			  <!-- Carousel items -->
+			  <div class="carousel-inner">
+					{% for img in gallery.index.images %}
+					{% if loop.first %}
+			    <div class="active item">{{ img|thumbnail(760, 500, "img-polaroid") }}</div>
+					{% else %}
+					<div class="item">{{ img|thumbnail(760, 500, "img-polaroid") }}</div>
+					{% endif %}
+					{% endfor %}
+			  </div>
+			  <!-- Carousel nav -->
+			  <a class="carousel-control left" href="#myCarousel" data-slide="prev">&lsaquo;</a>
+			  <a class="carousel-control right" href="#myCarousel" data-slide="next">&rsaquo;</a>
+			</div>
+		<!-- END carousel -->
+	  </div>
 	</div>
-	<!-- END pictures -->
+	<hr>
 
 {% endblock content %}

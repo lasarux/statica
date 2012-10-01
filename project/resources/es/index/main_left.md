@@ -16,6 +16,8 @@ Todo el personal conocerá a nivel de entender i hablar perfectamente los 2 idio
 
 Todas las habitaciones son exteriores y con orientación sur y/o suroeste.
 
-En los talleres se harán actividades como gimnasia adaptada a las personas mayores, inglés, informática, masaje, manualidades, jardinería, etc.
+En los talleres se harán actividades como gimnasia adaptada a las personas mayores, inglés, informática, masaje, manualidades, jardinería, fotografía, pintura, etc.
 
 La explotación del proyecto la llevará a cabo la empresa Residencia Geriátrica Les Ginestes, S.L.L.
+
+{{ resource.imagen004|thumbnail(360, 250, "img-polaroid") }}

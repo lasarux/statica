@@ -16,6 +16,8 @@ Tot el personal coneixerà a nivell d’ entendre i parlar perfectament els 2 id
 
 Totes les habitacions son exteriors i amb orientació sud i/o sudoest.
 
-En els tallers es faran activitats com gimnàstica adaptada a la gent gran, anglès, informàtica, massatge, manualitats, jardineria, etc.
+En els tallers es faran activitats com gimnàstica adaptada a la gent gran, anglès, informàtica, massatge, manualitats, jardineria, fotografia, pintura, etc.
 
 L’ explotació del projecte la durà a terme l’ empresa Residencia Geriàtrica Les Ginestes, S.L.L.
+
+{{ resource.imagen004|thumbnail(360, 250, "img-polaroid") }}
