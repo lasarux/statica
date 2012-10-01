@@ -1,4 +1,4 @@
-# - utf-8 - #
+# -*- coding: utf-8 -*-
 analytics_id = "UA-19757644-3"
 map_lat = 41.547087
 map_lon = 1.944162

@@ -4,7 +4,7 @@ __author__ = "Pedro Gracia"
 __copyright__ = "Copyright 2012, Impulzia S.L."
 __credits__ = ["Pedro Gracia"]
 __license__ = "BSD"
-__version__ = "0.5"
+__version__ = "0.6"
 __maintainer__ = "Pedro Gracia"
 __email__ = "pedro.gracia@impulzia.com"
 __status__ = "Development"
@@ -39,12 +39,20 @@ def get_cache(filename):
 def normalize(name):
     return name.lower().replace("-", "_").replace(".", "_")
 
-@evalcontextfilter
-def thumbnail(eval_ctx, value, width, height, style=""):
-    #result = do_something(value)
+
+@contextfilter
+def static(context, value):
+   result = '%s/%s' % (context['page'].pre, value.url)
+   if context.eval_ctx.autoescape:
+       result = Markup(result)
+   return result 
+
+
+@contextfilter
+def thumbnail(context, value, width, height,style=""):
     thumb = ImageOps.fit(value.image, (width, height), Image.ANTIALIAS)
     path = os.path.join(BUILD_DIR, 'static', 'img', 'thumbnail', value.filename)
-    url = '../static/img/thumbnail/%s' % value.filename
+    url = '%s/img/thumbnail/%s' % (context['page'].pre, value.filename)
     
     try:
         os.makedirs(os.path.join(BUILD_DIR, 'static', 'img', 'thumbnail'))
@@ -57,10 +65,9 @@ def thumbnail(eval_ctx, value, width, height, style=""):
     else:
         result = '<img src="%s" title="%s" alt="%s"/>' % (url, value.title, value.alt)
 
-    if eval_ctx.autoescape:
+    if context.eval_ctx.autoescape:
             result = Markup(result)
     return result
-
 
 class Static:
     """Basic Object for css, js and images resources"""
@@ -82,7 +89,7 @@ class Static:
                 key = '.'.join(key_split[:-1])
                 r = getattr(self, t)
                 key = key.replace('-', '_').replace('.', '_')
-                r[key] = '../static/%s/%s' % (t, file)
+                r[key] = '%s/%s' % (t, file) #TODO: add ../../../../ dynamicaly
 
 
 class Item:
@@ -120,14 +127,15 @@ class Item:
 
 
 class Img:
-    def __init__(self, filename, path, title="", alt=""):
+    def __init__(self, filename, path, lang=None, title='', alt=''):
         self.filename = filename
         self.image = Image.open(path)
         self.title = title
         self.alt = alt
         self.url = '../static/img/%s' % self.filename
         path = os.path.join(BUILD_DIR, 'static', 'img', self.filename)
-
+        
+        # save to build/static/img
         try:
             os.makedirs(os.path.join(BUILD_DIR, 'static', 'img'))
         except:
@@ -136,6 +144,38 @@ class Img:
 
     def __repr__(self):
         return '<img src="%s" title="%s" alt="%s" />' % (self.url, self.title, self.alt)
+    
+    def catalog_parse(self):
+        """Parse a page object in order to set attributes from its header"""
+        # read attributes until empty line or not key-value pair
+        is_header = True
+        for line in self.lines:
+            # add line to markdown if it isn't header
+            if not is_header:
+                self.md += line + ' '
+            else:
+                # empty line to split header from body
+                if is_header and line == "":
+                    self.md += '\n'
+                    continue
+                data = line.split(":")
+                # end of header
+                if len(data) == 1:
+                    is_header = False
+                    self.md += line + ' '
+                    continue
+                # add attribute to this object
+                attr = data[0]
+                data = line[len(attr)+1:].strip()
+                if data != 'main':
+                    try:
+                        # to eval a string is cool! (maths are welcome)
+                        value = eval(data)
+                    except:
+                        value = data
+                else:
+                    value = data
+                setattr(self, attr, value)
 
 class Resource:
     #TODO: review this and use Item
@@ -220,6 +260,15 @@ class Box:
                 setattr(self, attr, value)
         self.get_html() 
 
+
+def dyn(items, page):
+    items_pre = {}
+    pre = page.pre
+    for k,v in items.items():
+        items_pre[k] = '%s/%s' % (pre, v)
+    return items_pre
+
+
 def main(project_path):
     # main function
     #CACHE = get_cache('.cache')
@@ -272,6 +321,7 @@ def main(project_path):
     # initialize jinja2 objects
     env = Environment(loader=FileSystemLoader(TEMPLATES_DIR))
     env.filters['thumbnail'] = thumbnail
+    env.filters['static'] = static
     #template = env.get_template(TEMPLATE_DEFAULT)
     res = Static(STATIC_DIR)
     builtins = {}
@@ -320,17 +370,20 @@ def main(project_path):
                 m.root = root
                 #TODO: unify url and surl
                 if xelements[-1] != 'index':
-                    m.path = os.path.join(lang[0], xdir, 'index.html')
+                    m.name  = 'index'
+                    m.path = os.path.join(lang[0], xdir, '%s.html' % m.name)
                     m.dir = os.path.join(lang[0], xdir)
-                    m.name  ='index'
-                    m.url = '%s/%s/%s.html' % (lang[0], xdir, 'index')
-                    m.surl = '../%s/%s/%s.html' % (lang[0], xdir, 'index')
+                    m.name  = 'index'
+                    m.url = '%s/%s/%s.html' % (lang[0], xdir, m.name)
+                    m.surl = '../%s/%s/%s.html' % (lang[0], xdir, m.name)
+                    m.pre = '../' * (len(xelements) + 1) + 'static'
                 else:
                     m.name = root.split('/')[-1]
                     m.path = os.path.join(lang[0], '%s.html' % m.name)
                     m.dir = os.path.join(lang[0])
                     m.url = '%s/%s.html' % (lang[0], m.name)
                     m.surl = '../%s/%s.html' % (lang[0], m.name)
+                    m.pre = '../static'
                 m.lang = lang[0]
                 m.slang = lang[1]     
                 pages[lang[0]][xdir] = m
@@ -371,9 +424,15 @@ def main(project_path):
                     boxes['gallery'][key] = value 
             
                 template = env.get_template('%s' % t)
+                
+                # dynamically build resources url
+                css = dyn(res.css, m)
+                js = dyn(res.js, m)
+                img = dyn(res.img, m)
+                ico = dyn(res.ico, m)
+                
                 try:
-                    output_md = template.render(
-                        css=res.css, js=res.js, img=res.img, ico=res.ico, **boxes)
+                    output_md = template.render(css=css, js=js, img=img, ico=ico, **boxes)
                 except jinja2.exceptions.UndefinedError:
                     print "Warning, slot empty at %s" % m.name
                     output_md = SLOT_EMPTY
@@ -381,12 +440,12 @@ def main(project_path):
                 env_md = Environment()
                 env_md.filters['thumbnail'] = thumbnail
                 template_md = env_md.from_string(output_md)
-                output = template_md.render(
-                    css=res.css, js=res.js, img=res.img, ico=res.ico, **boxes)
+                
+                output = template_md.render(css=css, js=js, img=img, ico=ico, **boxes)
                 
                 try:
-                    print "creating directory %s" % os.path.join(BUILD_DIR, m.dir)
                     os.makedirs(os.path.join(BUILD_DIR, m.dir))
+                    print "directory %s created." % os.path.join(BUILD_DIR, m.dir)
                 except:
                     pass
                 codecs.open(os.path.join(BUILD_DIR, m.path), 'w', 'utf-8').write(output)
