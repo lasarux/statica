@@ -54,9 +54,10 @@ def thumbnail(context, value, width, height,style=""):
     
     if style:
         result = '<img class="%s" src="%s" title="%s" alt="%s"/>' % (style, url, value.title(), value.alt())
+        result += '<p><strong>%s</strong></p>' % value.description()
     else:
         result = '<img src="%s" title="%s" alt="%s"/>' % (url, value.title(), value.alt())
-    result += '<p>%s</p>' % value.description()
+
     if context.eval_ctx.autoescape:
             result = Markup(result)
     return result
@@ -121,7 +122,7 @@ class Item:
 class Img:
     def __init__(self, filename, path):
         self.filename = filename
-        self.name = '.'.join(filename.split('.')[:-1])
+        self.name = '.'.join(filename.split('.')[:-1]).lower()
         self.image = Image.open(path)
         self._title = {}
         self._alt = {}
@@ -140,16 +141,25 @@ class Img:
         
     def title(self):
         if self._title.has_key(PAGE.lang):
-            return self._title[PAGE.lang]
-        
+            res = self._title[PAGE.lang]
+        else:
+            res = ''
+        return res
+
     def alt(self):
         if self._alt.has_key(PAGE.lang):
-            return self._alt[PAGE.lang]
+            res = self._alt[PAGE.lang]
+        else:
+            res = ''
+        return res
         
     def description(self):
         if self._description.has_key(PAGE.lang):
-            return self._description[PAGE.lang]
-    
+            res = self._description[PAGE.lang]
+        else:
+            res = ''
+        return res
+
     def read_catalog(self, dirname):
         """read translated info about the image from language catalogs"""
         for lang in LANGUAGES:
@@ -161,9 +171,10 @@ class Img:
                 if line.startswith(self.name):
                     values = ''.join(line.split(':')[1:])
                     title, alt, description = values.split(',')
-                    self._title[lang] = title
-                    self._alt[lang] = alt
-                    self._description[lang] = description
+                    self._title[lang[0]] = title.replace(';', ',')
+                    self._alt[lang[0]] = alt.replace(';', ',')
+                    self._description[lang[0]] = description.replace(';', ',')
+                    break
 
     def save(self):
         # save to build/static/img
@@ -176,38 +187,6 @@ class Img:
 
     def __repr__(self):
         return '<img src="%s" title="%s" alt="%s" />' % (self.url(), self.title(), self.alt())
-    
-    def catalog_parse(self):
-        """Parse a page object in order to set attributes from its header"""
-        # read attributes until empty line or not key-value pair
-        is_header = True
-        for line in self.lines:
-            # add line to markdown if it isn't header
-            if not is_header:
-                self.md += line + ' '
-            else:
-                # empty line to split header from body
-                if is_header and line == "":
-                    self.md += '\n'
-                    continue
-                data = line.split(":")
-                # end of header
-                if len(data) == 1:
-                    is_header = False
-                    self.md += line + ' '
-                    continue
-                # add attribute to this object
-                attr = data[0]
-                data = line[len(attr)+1:].strip()
-                if data != 'main':
-                    try:
-                        # to eval a string is cool! (maths are welcome)
-                        value = eval(data)
-                    except:
-                        value = data
-                else:
-                    value = data
-                setattr(self, attr, value)
 
 class Resource:
     #TODO: review this and use Item
@@ -354,7 +333,6 @@ def main(project_path):
     # initialize jinja2 objects
     env = Environment(loader=FileSystemLoader(TEMPLATES_DIR))
     env.filters['thumbnail'] = thumbnail
-    env.filters['static'] = static
     #template = env.get_template(TEMPLATE_DEFAULT)
     res = Static(STATIC_DIR)
     builtins = {}

@@ -132,10 +132,14 @@
 			  <div class="carousel-inner">
 					{% for img in gallery.index.images %}
 					{% if loop.first %}
-			    <div class="active item">{{ img|thumbnail(760, 500, "img-polaroid") }}</div>
+			    <div class="active item">{{ img|thumbnail(770, 500) }}
 					{% else %}
-					<div class="item">{{ img|thumbnail(760, 500, "img-polaroid") }}</div>
+					<div class="item">{{ img|thumbnail(770, 500) }}
 					{% endif %}
+						<div class="carousel-caption">
+						  <h5 style="color:white;">{{ img.description() }}</h5>
+						</div>
+					</div>
 					{% endfor %}
 			  </div>
 			  <!-- Carousel nav -->
