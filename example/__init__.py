@@ -5,8 +5,8 @@ map_lon = 1.944162
 map_title = "Residencia Les Ginestes"
 map_zoom = 11
 LANGUAGES = [
-    ('ca', 'Catala'),
-    ('es', 'Espanol'),
+    ('ca', u'Català'),
+    ('es', u'Español'),
 ]
 
 # menu: key is a filename and value is the name of template (both without extension)

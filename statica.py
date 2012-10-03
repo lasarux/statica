@@ -4,7 +4,7 @@ __author__ = "Pedro Gracia"
 __copyright__ = "Copyright 2012, Impulzia S.L."
 __credits__ = ["Pedro Gracia"]
 __license__ = "BSD"
-__version__ = "0.6"
+__version__ = "0.7"
 __maintainer__ = "Pedro Gracia"
 __email__ = "pedro.gracia@impulzia.com"
 __status__ = "Development"
@@ -39,17 +39,9 @@ def get_cache(filename):
 def normalize(name):
     return name.lower().replace("-", "_").replace(".", "_")
 
-
-@contextfilter
-def static(context, value):
-   result = '%s/%s' % (context['page'].pre, value.url)
-   if context.eval_ctx.autoescape:
-       result = Markup(result)
-   return result 
-
-
 @contextfilter
 def thumbnail(context, value, width, height,style=""):
+    """thumbnail filter for jinja2"""
     thumb = ImageOps.fit(value.image, (width, height), Image.ANTIALIAS)
     path = os.path.join(BUILD_DIR, 'static', 'img', 'thumbnail', value.filename)
     url = '%s/img/thumbnail/%s' % (context['page'].pre, value.filename)
@@ -61,10 +53,10 @@ def thumbnail(context, value, width, height,style=""):
     thumb.save(path)
     
     if style:
-        result = '<img class="%s" src="%s" title="%s" alt="%s"/>' % (style, url, value.title, value.alt)
+        result = '<img class="%s" src="%s" title="%s" alt="%s"/>' % (style, url, value.title(), value.alt())
     else:
-        result = '<img src="%s" title="%s" alt="%s"/>' % (url, value.title, value.alt)
-
+        result = '<img src="%s" title="%s" alt="%s"/>' % (url, value.title(), value.alt())
+    result += '<p>%s</p>' % value.description()
     if context.eval_ctx.autoescape:
             result = Markup(result)
     return result
@@ -127,23 +119,63 @@ class Item:
 
 
 class Img:
-    def __init__(self, filename, path, lang=None, title='', alt=''):
+    def __init__(self, filename, path):
         self.filename = filename
+        self.name = '.'.join(filename.split('.')[:-1])
         self.image = Image.open(path)
-        self.title = title
-        self.alt = alt
-        self.url = '../static/img/%s' % self.filename
-        path = os.path.join(BUILD_DIR, 'static', 'img', self.filename)
+        self._title = {}
+        self._alt = {}
+        self._description = {}
+        self._url = 'img/%s' % self.filename
+        self.build_path = os.path.join(BUILD_DIR, 'static', 'img', self.filename)
+        dirname = os.path.dirname(path)
         
+        self.read_catalog(dirname)
+        self.save()
+    
+    def url(self):
+        # here we use the current page defined into main loop
+        url = '%s/%s' % (PAGE.pre, self._url)
+        return url
+        
+    def title(self):
+        if self._title.has_key(PAGE.lang):
+            return self._title[PAGE.lang]
+        
+    def alt(self):
+        if self._alt.has_key(PAGE.lang):
+            return self._alt[PAGE.lang]
+        
+    def description(self):
+        if self._description.has_key(PAGE.lang):
+            return self._description[PAGE.lang]
+    
+    def read_catalog(self, dirname):
+        """read translated info about the image from language catalogs"""
+        for lang in LANGUAGES:
+            try:
+                lines = codecs.open('%s/catalog.%s' % (dirname, lang[0]), 'r', 'utf-8').readlines()
+            except IOError:
+                break
+            for line in lines:
+                if line.startswith(self.name):
+                    values = ''.join(line.split(':')[1:])
+                    title, alt, description = values.split(',')
+                    self._title[lang] = title
+                    self._alt[lang] = alt
+                    self._description[lang] = description
+
+    def save(self):
         # save to build/static/img
         try:
+            # TODO: use dddrid
             os.makedirs(os.path.join(BUILD_DIR, 'static', 'img'))
         except:
             pass
-        self.image.save(path)
+        self.image.save(self.build_path)
 
     def __repr__(self):
-        return '<img src="%s" title="%s" alt="%s" />' % (self.url, self.title, self.alt)
+        return '<img src="%s" title="%s" alt="%s" />' % (self.url(), self.title(), self.alt())
     
     def catalog_parse(self):
         """Parse a page object in order to set attributes from its header"""
@@ -185,7 +217,7 @@ class Resource:
     def addfile(self, filename, path, title, alt):
         # TODO: autodiscover type
         name = '_'.join(filename.lower().split('.')[:-1])
-        img = Img(filename, path, "", "")
+        img = Img(filename, path)
         setattr(self, name, img)
 
 
@@ -197,7 +229,7 @@ class Gallery:
             ext = file.split('.')[-1]
             if ext.lower() in IMG_EXTENSION:
                 key = file[:-(len(ext)+1)]
-                img = Img(file, os.path.join(root, file), "", "")
+                img = Img(file, os.path.join(root, file))
                 self.images.append(img)
                     
     def parse_catalog(self):
@@ -284,6 +316,7 @@ def main(project_path):
     #templates = {}
 
     exec("import %s as s" % PROJECT_DIR)
+    globals()['LANGUAGES'] = s.LANGUAGES
 
     google_analytics = Template("""<script type="text/javascript">
 
@@ -341,7 +374,6 @@ def main(project_path):
 
     shutil.copytree(STATIC_DIR, os.path.join(BUILD_DIR, 'static/'))
     
-    # TODO: images are optional
     # process image galleries
     # TODO: remove this and use Item
     galleries = {}
@@ -358,7 +390,7 @@ def main(project_path):
             res_obj.addfile(file, os.path.join(RESOURCES_IMG_DIR, file), "", "")
     
     # process page files
-    pages = {}
+    pages = {} #TODO: Page class?
     for lang in s.LANGUAGES:
         pages[lang[0]] = {}
         for root, dirs, files in os.walk(os.path.join(RESOURCES_DIR, lang[0])):
@@ -393,6 +425,7 @@ def main(project_path):
     # process markdown resources for each language
     for l, p in pages.items():
         for m in p.values():
+            globals()['PAGE'] = m # current page goes to global 'page' var
             t = '%s.html' % m.template #template
             for root, dirs, files in os.walk(m.root):
                 boxes = {}

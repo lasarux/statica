@@ -2,7 +2,7 @@
 {% block content %}
   <!-- Main hero unit for a primary marketing message or call to action -->
   <div class="hero-unit">
-  	<img style="float: left; margin-right: 30px;" alt="les ginestes logo" src="{{ image.lesginestes_logo|static }}" />
+  	<img style="float: left; margin-right: 30px;" alt="les ginestes logo" src="{{ image.lesginestes_logo.url() }}" />
     {{ main_top }}
     <p>
 		<a class="btn btn-primary btn-large" data-toggle="modal" href="#moreInfo">{{ main_top.buttontext }}</a>
@@ -100,7 +100,9 @@
 		  <li>
 		    <div class="thumbnail">
 		      <div id="map_canvas"></div>
+					<div class="caption">
 			      {{ main_map }}
+					</div>
 		    </div>
 		  </li>
 		</ul>
