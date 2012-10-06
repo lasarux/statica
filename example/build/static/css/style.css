@@ -1,0 +1,35 @@
+body {
+  margin-top: 40px;
+  margin-bottom: 40px;
+}
+
+.hero-unit {
+  background: #eee url('../../static/img/background.jpg'); 
+}
+
+.table td {
+  text-align: right;
+}
+
+.modal {
+  width: 800px;
+}
+
+.data {
+	height: 520px;
+}
+
+.choose-lang {
+	position: fixed; 
+	right: 10px; 
+	top: 0px;
+}
+
+#map {
+	border: 1px gray;
+	margin: 30px;
+}
+
+#map_canvas {
+    height:300px;
+}
