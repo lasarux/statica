@@ -1,6 +1,6 @@
-##El proyecto
+##El proyecta
 
-Se trata de efectuar la explotación de un edificio con 13 habitaciones dobles y una sencilla, y servicios comunes de comedor, sala de estar, de TV, gimnasio, aulas, etc. No obstante, cada habitación dispondrá de TV y teléfono en la habitación. Para gente mayor, o noy pero que requiere de una vigilancia y/o control aceptado por parte del residente.
+See trata de efectuar la explotación de un edificio con 13 habitaciones dobles y una sencilla, y servicios comunes de comedor, sala de estar, de TV, gimnasio, aulas, etc. No obstante, cada habitación dispondrá de TV y teléfono en la habitación. Para gente mayor, o noy pero que requiere de una vigilancia y/o control aceptado por parte del residente.
 
 Asimismo, también dispondremos de un Centro de Día con capacidad para 30 persones.
 

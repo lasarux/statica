@@ -1,6 +1,6 @@
 ##La Inversión
 
-La Residencia funcionará en un edificio de nueva construcción que cumple toda la Normativa per ser un Centre Concertado de la Generalitat de Catalunya i se encuentra dentro de un terreno de 912 mˆ2ˆ  en el núcleo urbano de Viladecavalls a 200 mts. de la parada del autobús urbano-interurbano que conecta la localidad con Terrassa y Olesa de Montserrat.
+La Residencia funcionará porque es en un edificio de nueva construcción que cumple toda la Normativa per ser un Centre Concertado de la Generalitat de Catalunya i se encuentra dentro de un terreno de 912 mˆ2ˆ  en el núcleo urbano de Viladecavalls a 200 mts. de la parada del autobús urbano-interurbano que conecta la localidad con Terrassa y Olesa de Montserrat.
 
 {{ resource.file0165|thumbnail(360, 250, "img-polaroid") }}
 

@@ -2,7 +2,7 @@
 
 La Residencia funcionarà en un edifici de nova construcció que compleix tota la Normativa per ser un Centre Concertat de la Generalitat de Catalunya i es troba dins un terreny de 912 m2 al nucli urbà de Viladecavalls a 200 mts. de la parada del autobús urbà-interrurbà que conecta la localitat amb Terrassa i Olesa de Montserrat.
 
-{{ resource.file0165|thumbnail(360, 250, "img-polaroid") }}
+{{ image.file0165|thumbnail(360, 250, "img-polaroid") }}
 
 Tenim Llicència Municipal de construcció i d' activitats.
 

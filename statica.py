@@ -4,7 +4,7 @@ __author__ = "Pedro Gracia"
 __copyright__ = "Copyright 2012, Impulzia S.L."
 __credits__ = ["Pedro Gracia"]
 __license__ = "BSD"
-__version__ = "0.7"
+__version__ = "0.8"
 __maintainer__ = "Pedro Gracia"
 __email__ = "pedro.gracia@impulzia.com"
 __status__ = "Development"
@@ -23,7 +23,6 @@ from jinja2 import evalcontextfilter, contextfilter, Markup, escape
 from PIL import Image, ImageOps
 import jinja2.exceptions 
 
-BUILD_DIR = 'build/'
 IMG_EXTENSION = ['jpg', 'jpeg', 'png', 'gif']
 SLOT_EMPTY = 'SLOT EMPTY - PLEASE FILL IN'
 
@@ -38,6 +37,14 @@ def get_cache(filename):
 
 def normalize(name):
     return name.lower().replace("-", "_").replace(".", "_")
+
+def value_or_empty(value):
+    # PAGE is a global variable
+    if value.has_key(PAGE.lang):
+        res = value[PAGE.lang]
+    else:
+        res = ''
+    return res
 
 @contextfilter
 def thumbnail(context, value, width, height,style=""):
@@ -63,6 +70,7 @@ def thumbnail(context, value, width, height,style=""):
     return result
 
 class Static:
+    #TODO: use Item instead
     """Basic Object for css, js and images resources"""
     def __init__(self, path):
         self.css = {}
@@ -86,27 +94,52 @@ class Static:
 
 
 class Item:
-    def __init__(self, root, parent=None):
+    def __init__(self, root, parent=None, only_children=False):
         self.parent = parent
         self.root = root
+        self.only_children = only_children
+        self.type = None
         self.children = []
         
-        self.discover(root)
+        self.parse_page()
+        self.discover()
         
     def __unicode__(self):
         print self.root
 
     def add_value(self, name, value):
-        setattr(self, normalize(name), value)
+        if not self.only_children:
+            setattr(self, normalize(name), value)
         
     def add_child(self, name, item):
         self.add_value(name, item)
         self.children.append(item)
 
-    def discover(self, root):
-        items = os.listdir(root)
+    def parse_page(self):
+        # TODO: use item for images too?
+        if os.path.exists('%s/page.md' % self.root):
+            self.type = 'page'
+            lines = codecs.open('%s/page.md' % self.root, 'r', 'utf-8').readlines()
+            for line in lines:
+                data = line.split(':')
+                key = data[0]
+                values = ''.join(data[1:])
+                if values.strip == '':
+                    break
+                else:
+                    try:
+                        # to eval a string is cool! (maths are welcome)
+                        value = eval(data)
+                    except:
+                        value = data
+                    setattr(self, key, value)
+        else:
+            self.type = 'dir'
+
+    def discover(self):
+        items = os.listdir(self.root)
         for item in items:            
-            path = os.path.join(root, item)
+            path = os.path.join(self.root, item)
             if os.path.isdir(path):
                 self.add_child(item, Item(path, self))
             else:
@@ -135,30 +168,18 @@ class Img:
         self.save()
     
     def url(self):
-        # here we use the current page defined into main loop
+        # here we use the current page defined into main loop (it's a global variable)
         url = '%s/%s' % (PAGE.pre, self._url)
         return url
         
     def title(self):
-        if self._title.has_key(PAGE.lang):
-            res = self._title[PAGE.lang]
-        else:
-            res = ''
-        return res
+        return value_or_empty(self._title)
 
     def alt(self):
-        if self._alt.has_key(PAGE.lang):
-            res = self._alt[PAGE.lang]
-        else:
-            res = ''
-        return res
+        return value_or_empty(self._alt)
         
     def description(self):
-        if self._description.has_key(PAGE.lang):
-            res = self._description[PAGE.lang]
-        else:
-            res = ''
-        return res
+        return value_or_empty(self._description)
 
     def read_catalog(self, dirname):
         """read translated info about the image from language catalogs"""
@@ -168,7 +189,7 @@ class Img:
             except IOError:
                 break
             for line in lines:
-                if line.startswith(self.name):
+                if line.startswith('%s:' % self.name):
                     values = ''.join(line.split(':')[1:])
                     title, alt, description = values.split(',')
                     self._title[lang[0]] = title.replace(';', ',')
@@ -216,7 +237,7 @@ class Gallery:
     
 
 class Box:
-    """Basic Page object"""
+    """Basic Box object"""
     def __init__(self, filename):
         self.filename = filename
         self.lines = codecs.open(filename, "r", "utf-8").readlines()
@@ -286,6 +307,7 @@ def main(project_path):
     
     # initial constants
     PROJECT_DIR = project_path
+    BUILD_DIR = os.path.join(PROJECT_DIR, 'build/')
     RESOURCES_DIR = os.path.join(PROJECT_DIR, 'resources/')
     RESOURCES_IMG_DIR = os.path.join(RESOURCES_DIR, 'img')
     STATIC_DIR = os.path.join(PROJECT_DIR, 'static/')
@@ -296,6 +318,7 @@ def main(project_path):
 
     exec("import %s as s" % PROJECT_DIR)
     globals()['LANGUAGES'] = s.LANGUAGES
+    globals()['BUILD_DIR'] = BUILD_DIR
 
     google_analytics = Template("""<script type="text/javascript">
 
@@ -369,7 +392,10 @@ def main(project_path):
     
     # process page files
     pages = {} #TODO: Page class?
+    menus = {}
     for lang in s.LANGUAGES:
+        #TODO: join menus and pages ??
+        menus[lang[0]] = Item(os.path.join(RESOURCES_DIR, lang[0]))
         pages[lang[0]] = {}
         for root, dirs, files in os.walk(os.path.join(RESOURCES_DIR, lang[0])):
             # only scan dirs with a page.md file
@@ -464,4 +490,6 @@ def main(project_path):
 if __name__ == '__main__':
     if len(sys.argv) != 2:
         sys.exit('Usage: %s path/to/project' % sys.argv[0])
-    main(sys.argv[1])
+        
+    project = sys.argv[1].endswith('/') and sys.argv[1][:-1] or sys.argv[1] #nice line!!! :-)
+    main(project)
