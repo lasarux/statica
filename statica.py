@@ -99,6 +99,7 @@ class Item:
         self.root = root
         self.only_children = only_children
         self.type = None
+        self._index = []
         self.children = []
         
         self.parse_page()
@@ -107,13 +108,28 @@ class Item:
     def __unicode__(self):
         print self.root
 
-    def add_value(self, name, value):
+    def add_value(self, name, item):
         if not self.only_children:
-            setattr(self, normalize(name), value)
+            setattr(self, normalize(name), item)
         
     def add_child(self, name, item):
         self.add_value(name, item)
-        self.children.append(item)
+        item.parent = self # add parent (self) to item
+        l = len(self._index)
+        if l > 0:
+            for i in range(len(self._index)):
+                if hasattr(item, 'id'):
+                    if item.id >= self._index[i]:
+                        self._index.insert(i+1, item.id)
+                        self.children.insert(i+1, item)
+                        break
+                else:
+                    self._index.append(9999)
+                    self.children.append(item)
+                    break
+        else:
+            self._index.append(9999)
+            self.children.append(item)
 
     def parse_page(self):
         # TODO: use item for images too?
@@ -127,11 +143,11 @@ class Item:
                 if values.strip == '':
                     break
                 else:
-                    try:
-                        # to eval a string is cool! (maths are welcome)
-                        value = eval(data)
-                    except:
-                        value = data
+                    #try:
+                    #    # to eval a string is cool! (maths are welcome)
+                    #    value = eval(data)
+                    #except:
+                    value = values
                     setattr(self, key, value)
         else:
             self.type = 'dir'
@@ -240,7 +256,11 @@ class Box:
     """Basic Box object"""
     def __init__(self, filename):
         self.filename = filename
-        self.lines = codecs.open(filename, "r", "utf-8").readlines()
+        try:
+            self.lines = codecs.open(filename, "r", "utf-8").readlines()
+        except UnicodeDecodeError:
+            print 'Please, use UTF-8 in %s' % filename
+            sys.exit(1) 
         self.md = ""
         self.html = ""
         
@@ -281,15 +301,17 @@ class Box:
                 # add attribute to this object
                 attr = data[0]
                 data = line[len(attr)+1:].strip()
-                if data != 'main':
-                    try:
-                        # to eval a string is cool! (maths are welcome)
-                        value = eval(data)
-                    except:
-                        value = data
-                else:
-                    value = data
+                value = data
+                #if attr != 'id':
+                #    try:
+                #        # to eval a string is cool! (maths are welcome)
+                #        value = eval(data)
+                #    except:
+                #        value = data
+                #else:
+                #    value = data
                 setattr(self, attr, value)
+
         self.get_html() 
 
 
@@ -365,7 +387,7 @@ def main(project_path):
         builtins['google_analytics'] = google_analytics.render(analytics_id=s.analytics_id)
         builtins['google_maps'] = google_maps.render(zoom=s.map_zoom, lat=s.map_lat, lon=s.map_lon, title=s.map_title)
     except:
-        print "Warning! There isn't information about Google services"
+        print "Warning! There aren't information to setup Google services."
 
     # copy static/ to build/static
     try:
@@ -392,10 +414,10 @@ def main(project_path):
     
     # process page files
     pages = {} #TODO: Page class?
-    menus = {}
+    menu = {}
     for lang in s.LANGUAGES:
         #TODO: join menus and pages ??
-        menus[lang[0]] = Item(os.path.join(RESOURCES_DIR, lang[0]))
+        menu[lang[0]] = Item(os.path.join(RESOURCES_DIR, lang[0]))
         pages[lang[0]] = {}
         for root, dirs, files in os.walk(os.path.join(RESOURCES_DIR, lang[0])):
             # only scan dirs with a page.md file
@@ -430,14 +452,20 @@ def main(project_path):
     for l, p in pages.items():
         for m in p.values():
             globals()['PAGE'] = m # current page goes to global 'page' var
-            t = '%s.html' % m.template #template
+            try:
+                t = '%s.html' % m.template #template
+            except AttributeError:
+                print "Please, define a template for page %s/%s." % (m.lang, m.name)
+                t = '%s.html' % s.DEFAULT_TEMPLATE
             for root, dirs, files in os.walk(m.root):
                 boxes = {}
                 for file in files:
                     #TODO: check extension (markdown, html, etc.)
-                    box = Box(join(root, file))
-                    key = file.split('.')[0]
-                    boxes[key] = box
+                    #process files except hiddens
+                    if not file.startswith('.'):
+                        box = Box(join(root, file))
+                        key = file.split('.')[0]
+                        boxes[key] = box
                 
                 # get each page with same name
                 lang_pages = []
@@ -455,7 +483,9 @@ def main(project_path):
                 boxes['gallery'] = {}
                 boxes['image'] = resources_img
                 boxes['lang_pages'] = lang_pages
-            
+                
+                menu_lang = menu[m.lang].children
+                
                 # gallery items
                 for key, value in galleries.items():
                     boxes['gallery'][key] = value 
@@ -469,7 +499,7 @@ def main(project_path):
                 ico = dyn(res.ico, m)
                 
                 try:
-                    output_md = template.render(css=css, js=js, img=img, ico=ico, **boxes)
+                    output_md = template.render(css=css, js=js, img=img, ico=ico, menu=menu_lang, **boxes)
                 except jinja2.exceptions.UndefinedError:
                     print "Warning, slot empty at %s" % m.name
                     output_md = SLOT_EMPTY
@@ -478,7 +508,7 @@ def main(project_path):
                 env_md.filters['thumbnail'] = thumbnail
                 template_md = env_md.from_string(output_md)
                 
-                output = template_md.render(css=css, js=js, img=img, ico=ico, **boxes)
+                output = template_md.render(css=css, js=js, img=img, ico=ico, menu=menu_lang, **boxes)
                 
                 try:
                     os.makedirs(os.path.join(BUILD_DIR, m.dir))
