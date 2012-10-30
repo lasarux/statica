@@ -27,7 +27,7 @@ IMG_EXTENSION = ['jpg', 'jpeg', 'png', 'gif']
 SLOT_EMPTY = 'SLOT EMPTY - PLEASE FILL IN'
 
 # initialize makdown object
-md = markdown.Markdown(safe_mode=False, extensions=['tables', 'superscript'])
+md = markdown.Markdown(safe_mode=False, extensions=['tables']) #, 'superscript'])
 
 def get_cache(filename):
     if os.path.exists(filename):
@@ -110,7 +110,7 @@ class Item:
         self.children = []
         self.level = level
         self.lang = lang
-        self._url = '/'.join(root.split('/')[-level:]) + '/index.html' # FIXME: split('/') doesn't work in windows
+        self._url = '/'.join(root.split(os.path.sep)[-level:]) + '/index.html' # FIXME: split('/') doesn't work in windows
         
         self.parse_page()
         self.discover()
@@ -159,7 +159,7 @@ class Item:
             for line in lines:
                 data = clean_line(line).split(':')
                 key = data[0]
-                values = ''.join(data[1:])[:-1] # drop '\n'
+                values = ''.join(data[1:]).strip('\r\n') # drop '\n'
                 if values.strip == '':
                     break
                 else:
@@ -170,6 +170,7 @@ class Item:
                     #except:
                     #    value = values
                     setattr(self, key, value)
+
         else:
             self.type = 'dir'
 
@@ -315,11 +316,7 @@ class Box:
                     self.md += '\n'
                     continue
                 data = clean_line(line).split(":")
-                if self.filename == 'expandyourmind/resources/es/index/page.md':
-                    print "---", self.filename, data
-                    t = True
-                else:
-                    t = False
+
                 # end of header
                 if len(data) == 1:
                     is_header = False
@@ -327,8 +324,7 @@ class Box:
                     continue
                 # add attribute to this object
                 attr = data[0]
-                data = line[len(attr)+1:].strip()
-                value = data
+                value = data[1].strip('\r\n')
                 # TODO: use symbol '#' to mark expresions to evaluate
                 #try:
                     # to eval a string is cool! (maths are welcome)
@@ -352,6 +348,7 @@ def dyn(items):
 def walk(item, items={}):
     items = items
     for i in item.children:
+        print "+++", items, type(i), i, i.id
         items[i.id] = i
         if i.children:
             walk(i, items)
@@ -425,11 +422,11 @@ def main(project_path):
 
     # copy static/ to build/static
     try:
-        shutil.rmtree(os.path.join(BUILD_DIR, 'static/'))
+        shutil.rmtree(os.path.join(BUILD_DIR, 'static'))
     except:
         pass
 
-    shutil.copytree(STATIC_DIR, os.path.join(BUILD_DIR, 'static/'))
+    shutil.copytree(STATIC_DIR, os.path.join(BUILD_DIR, 'static'))
     
     # process image galleries
     # TODO: remove this and use Item
@@ -502,7 +499,7 @@ def main(project_path):
                 for key, value in galleries.items():
                     boxes['gallery'][key] = value 
             
-                template = env.get_template('%s' % t)
+                template = env.get_template(t)
                 
                 # dynamically build resources url
                 css = dyn(res.css)
@@ -523,15 +520,15 @@ def main(project_path):
                 output = template_md.render(css=css, js=js, img=img, ico=ico, menu=menu_lang, **boxes)
                 
                 try:
-                    os.makedirs(os.path.join(BUILD_DIR, os.path.join(*m.root.split('/')[-m.level-1:])))
-                    print "directory %s created." % os.path.join(BUILD_DIR, l[0], os.path.join(m.root.split('/')[-m.level-1:]))
+                    os.makedirs(os.path.join(BUILD_DIR, os.path.join(*m.root.split(os.path.sep)[-m.level-1:])))
+                    print "directory %s created." % os.path.join(BUILD_DIR, l[0], os.path.join(m.root.split(os.path.sep)[-m.level-1:]))
                 except:
                     pass
-                codecs.open(os.path.join(BUILD_DIR, l[0], os.path.join(*m.root.split('/')[-m.level:]), 'index.html'), 'w', 'utf-8').write(output)
+                codecs.open(os.path.join(BUILD_DIR, l[0], os.path.join(*m.root.split(os.path.sep)[-m.level:]), 'index.html'), 'w', 'utf-8').write(output)
 
 if __name__ == '__main__':
     if len(sys.argv) != 2:
         sys.exit('Usage: %s path/to/project' % sys.argv[0])
         
-    project = sys.argv[1].endswith('/') and sys.argv[1][:-1] or sys.argv[1] #nice line!!! :-)
+    project = sys.argv[1].endswith(os.path.sep) and sys.argv[1][:-1] or sys.argv[1] #nice line!!! :-)
     main(project)
