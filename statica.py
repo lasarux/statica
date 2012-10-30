@@ -4,7 +4,7 @@ __author__ = "Pedro Gracia"
 __copyright__ = "Copyright 2012, Impulzia S.L."
 __credits__ = ["Pedro Gracia"]
 __license__ = "BSD"
-__version__ = "0.8"
+__version__ = "0.9"
 __maintainer__ = "Pedro Gracia"
 __email__ = "pedro.gracia@impulzia.com"
 __status__ = "Development"
@@ -35,8 +35,15 @@ def get_cache(filename):
     else:
         CACHE = {}
 
+def clean_line(line):
+    """clean data line before process it"""
+    if line.endswith('/n'):
+        line = line[:-1]
+    return line
+
 def normalize(name):
-    return name.lower().replace("-", "_").replace(".", "_")
+    """convert name with spaces, minus or dots to name with underscores"""
+    return name.lower().replace(' ', '_').replace('-', '_').replace('.', '_')
 
 def value_or_empty(value):
     # PAGE is a global variable
@@ -82,31 +89,39 @@ class Static:
         self.include(path, 'img')
         self.include(path, 'ico')
         
-    def include(self, path, t):
+    def include(self, path, d):
         """walk throught static dirs to get files"""
-        for root, dirs, files in os.walk(os.path.join(path, t)):
+        for root, dirs, files in os.walk(os.path.join(path, d)):
             for file in files:
                 key_split = file.split('.')
                 key = '.'.join(key_split[:-1])
-                r = getattr(self, t)
+                r = getattr(self, d)
                 key = key.replace('-', '_').replace('.', '_')
-                r[key] = '%s/%s' % (t, file) #TODO: add ../../../../ dynamicaly
+                r[key] = '%s/%s' % (d, file)
 
 
 class Item:
-    def __init__(self, root, parent=None, only_children=False):
+    def __init__(self, root, lang=None, parent=None, only_children=False, level=0):
         self.parent = parent
         self.root = root
         self.only_children = only_children
         self.type = None
         self._index = []
         self.children = []
+        self.level = level
+        self.lang = lang
+        self._url = '/'.join(root.split('/')[-level:]) + '/index.html' # FIXME: split('/') doesn't work in windows
         
         self.parse_page()
         self.discover()
+
         
-    def __unicode__(self):
-        print self.root
+    def url(self):
+        if 'PAGE' in globals():
+            r = '../' * PAGE.level + self._url
+        else:
+            r = 'Error: Global PAGE object doesn\'t defined'
+        return r
 
     def add_value(self, name, item):
         if not self.only_children:
@@ -116,38 +131,44 @@ class Item:
         self.add_value(name, item)
         item.parent = self # add parent (self) to item
         l = len(self._index)
+        if hasattr(item, 'id'):
+            id = item.id
+        else:
+            print "Item without id"
+            id = 'zzzz'
         if l > 0:
             for i in range(len(self._index)):
-                if hasattr(item, 'id'):
-                    if item.id >= self._index[i]:
-                        self._index.insert(i+1, item.id)
-                        self.children.insert(i+1, item)
-                        break
-                else:
-                    self._index.append(9999)
-                    self.children.append(item)
+                if id <= self._index[i]:
+                    self._index.insert(i, id)
+                    self.children.insert(i, item)
+                    id = 'done'
                     break
+            if id != 'done':
+                self._index.append(id)
+                self.children.append(item)
         else:
-            self._index.append(9999)
+            self._index.append(id)
             self.children.append(item)
 
     def parse_page(self):
         # TODO: use item for images too?
         if os.path.exists('%s/page.md' % self.root):
             self.type = 'page'
+            self.box = Box('%s/page.md' % self.root)
             lines = codecs.open('%s/page.md' % self.root, 'r', 'utf-8').readlines()
             for line in lines:
-                data = line.split(':')
+                data = clean_line(line).split(':')
                 key = data[0]
-                values = ''.join(data[1:])
+                values = ''.join(data[1:])[:-1] # drop '\n'
                 if values.strip == '':
                     break
                 else:
-                    #try:
-                    #    # to eval a string is cool! (maths are welcome)
-                    #    value = eval(data)
-                    #except:
                     value = values
+                    #try:
+                        # to eval a string is cool! (maths are welcome)
+                    #    value = eval(values)
+                    #except:
+                    #    value = values
                     setattr(self, key, value)
         else:
             self.type = 'dir'
@@ -157,7 +178,7 @@ class Item:
         for item in items:            
             path = os.path.join(self.root, item)
             if os.path.isdir(path):
-                self.add_child(item, Item(path, self))
+                self.add_child(item, Item(path, parent=self, level=self.level + 1))
             else:
                 ext = item.split('.')[-1]
                 if ext.lower() in IMG_EXTENSION:
@@ -223,7 +244,8 @@ class Img:
         self.image.save(self.build_path)
 
     def __repr__(self):
-        return '<img src="%s" title="%s" alt="%s" />' % (self.url(), self.title(), self.alt())
+            return self
+        #return '<img src="%s" title="%s" alt="%s" />' % (self.url(), self.title(), self.alt())
 
 class Resource:
     #TODO: review this and use Item
@@ -292,7 +314,12 @@ class Box:
                 if is_header and line == "":
                     self.md += '\n'
                     continue
-                data = line.split(":")
+                data = clean_line(line).split(":")
+                if self.filename == 'expandyourmind/resources/es/index/page.md':
+                    print "---", self.filename, data
+                    t = True
+                else:
+                    t = False
                 # end of header
                 if len(data) == 1:
                     is_header = False
@@ -302,26 +329,33 @@ class Box:
                 attr = data[0]
                 data = line[len(attr)+1:].strip()
                 value = data
-                #if attr != 'id':
-                #    try:
-                #        # to eval a string is cool! (maths are welcome)
-                #        value = eval(data)
-                #    except:
-                #        value = data
-                #else:
-                #    value = data
+                # TODO: use symbol '#' to mark expresions to evaluate
+                #try:
+                    # to eval a string is cool! (maths are welcome)
+                    #value = eval(data)
+                #except:
+                #value = data
+                #    if t: print "+++", attr, value
                 setattr(self, attr, value)
-
         self.get_html() 
 
 
-def dyn(items, page):
+def dyn(items):
     items_pre = {}
-    pre = page.pre
+    pre = '../' * (PAGE.level +1) #page.pre
     for k,v in items.items():
-        items_pre[k] = '%s/%s' % (pre, v)
+        items_pre[k] = '%s/static/%s' % (pre[:-1], v)
     return items_pre
 
+
+# TEST: to show pages
+def walk(item, items={}):
+    items = items
+    for i in item.children:
+        items[i.id] = i
+        if i.children:
+            walk(i, items)
+    return items
 
 def main(project_path):
     # main function
@@ -329,11 +363,11 @@ def main(project_path):
     
     # initial constants
     PROJECT_DIR = project_path
-    BUILD_DIR = os.path.join(PROJECT_DIR, 'build/')
-    RESOURCES_DIR = os.path.join(PROJECT_DIR, 'resources/')
+    BUILD_DIR = os.path.join(PROJECT_DIR, 'build')
+    RESOURCES_DIR = os.path.join(PROJECT_DIR, 'resources')
     RESOURCES_IMG_DIR = os.path.join(RESOURCES_DIR, 'img')
-    STATIC_DIR = os.path.join(PROJECT_DIR, 'static/')
-    TEMPLATES_DIR = os.path.join(PROJECT_DIR, 'templates/')
+    STATIC_DIR = os.path.join(PROJECT_DIR, 'static')
+    TEMPLATES_DIR = os.path.join(PROJECT_DIR, 'templates')
     TEMPLATE_DEFAULT = 'main.html'
     #DEFAULT_LANGUAGE = 'ca'
     #templates = {}
@@ -407,55 +441,26 @@ def main(project_path):
     # process images
     # TODO: remove this and use Item
     res_obj = Resource()
-    for file in os.listdir(RESOURCES_IMG_DIR):
-        ext = file.split('.')[-1]
-        if ext.lower() in IMG_EXTENSION:
-            res_obj.addfile(file, os.path.join(RESOURCES_IMG_DIR, file), "", "")
     
     # process page files
     pages = {} #TODO: Page class?
     menu = {}
     for lang in s.LANGUAGES:
         #TODO: join menus and pages ??
-        menu[lang[0]] = Item(os.path.join(RESOURCES_DIR, lang[0]))
-        pages[lang[0]] = {}
-        for root, dirs, files in os.walk(os.path.join(RESOURCES_DIR, lang[0])):
-            # only scan dirs with a page.md file
-            if 'page.md' in files:
-                m = Box(os.path.join(root, 'page.md'))
-                xelements = root.split("/")[3:]
-                xdir = "/".join(xelements)
-                m.root = root
-                #TODO: unify url and surl
-                if xelements[-1] != 'index':
-                    m.name  = 'index'
-                    m.path = os.path.join(lang[0], xdir, '%s.html' % m.name)
-                    m.dir = os.path.join(lang[0], xdir)
-                    m.name  = 'index'
-                    m.url = '%s/%s/%s.html' % (lang[0], xdir, m.name)
-                    m.surl = '../%s/%s/%s.html' % (lang[0], xdir, m.name)
-                    m.pre = '../' * (len(xelements) + 1) + 'static'
-                else:
-                    m.name = root.split('/')[-1]
-                    m.path = os.path.join(lang[0], '%s.html' % m.name)
-                    m.dir = os.path.join(lang[0])
-                    m.url = '%s/%s.html' % (lang[0], m.name)
-                    m.surl = '../%s/%s.html' % (lang[0], m.name)
-                    m.pre = '../static'
-                m.lang = lang[0]
-                m.slang = lang[1]     
-                pages[lang[0]][xdir] = m
+        menu[lang[0]] = Item(os.path.join(RESOURCES_DIR, lang[0]), lang=lang[0], level=0)
+        pages[lang[0]] = walk(Item(os.path.join(RESOURCES_DIR, lang[0]), lang=lang[0], level=0))
 
     resources_img = Item(os.path.join(RESOURCES_DIR, 'img'))
 
-    # process markdown resources for each language
-    for l, p in pages.items():
-        for m in p.values():
+    for lang in s.LANGUAGES:
+        for n, m in pages[lang[0]].items():
+            
             globals()['PAGE'] = m # current page goes to global 'page' var
             try:
                 t = '%s.html' % m.template #template
             except AttributeError:
-                print "Please, define a template for page %s/%s." % (m.lang, m.name)
+                print ">>>", n
+                print "Please, define a template for page %s/%s." % (lang[0], m.id)
                 t = '%s.html' % s.DEFAULT_TEMPLATE
             for root, dirs, files in os.walk(m.root):
                 boxes = {}
@@ -468,13 +473,20 @@ def main(project_path):
                         boxes[key] = box
                 
                 # get each page with same name
+                #lang_pages = []
+                #for k, v in pages.items():
+                #    try:
+                #        lang_pages.append(v[m.title])
+                #    except KeyError:
+                #        print "Warning: missing info for '%s' language." % m.dir
+                
                 lang_pages = []
-                for k, v in pages.items():
+                for l in s.LANGUAGES:
                     try:
-                        lang_pages.append(v[m.name])
+                        lang_pages.append(pages[l[0]][m.id])
                     except KeyError:
-                        print "Warning: missing info for '%s' language." % m.dir
-                        
+                        print "Warning: missing info for '%s' language." % l
+                       
                 # write output file
                 boxes['current_language'] = m.lang
                 boxes['builtins'] = builtins
@@ -484,7 +496,7 @@ def main(project_path):
                 boxes['image'] = resources_img
                 boxes['lang_pages'] = lang_pages
                 
-                menu_lang = menu[m.lang].children
+                menu_lang = menu[lang[0]].children
                 
                 # gallery items
                 for key, value in galleries.items():
@@ -493,10 +505,10 @@ def main(project_path):
                 template = env.get_template('%s' % t)
                 
                 # dynamically build resources url
-                css = dyn(res.css, m)
-                js = dyn(res.js, m)
-                img = dyn(res.img, m)
-                ico = dyn(res.ico, m)
+                css = dyn(res.css)
+                js = dyn(res.js)
+                img = dyn(res.img)
+                ico = dyn(res.ico)
                 
                 try:
                     output_md = template.render(css=css, js=js, img=img, ico=ico, menu=menu_lang, **boxes)
@@ -511,11 +523,11 @@ def main(project_path):
                 output = template_md.render(css=css, js=js, img=img, ico=ico, menu=menu_lang, **boxes)
                 
                 try:
-                    os.makedirs(os.path.join(BUILD_DIR, m.dir))
-                    print "directory %s created." % os.path.join(BUILD_DIR, m.dir)
+                    os.makedirs(os.path.join(BUILD_DIR, os.path.join(*m.root.split('/')[-m.level-1:])))
+                    print "directory %s created." % os.path.join(BUILD_DIR, l[0], os.path.join(m.root.split('/')[-m.level-1:]))
                 except:
                     pass
-                codecs.open(os.path.join(BUILD_DIR, m.path), 'w', 'utf-8').write(output)
+                codecs.open(os.path.join(BUILD_DIR, l[0], os.path.join(*m.root.split('/')[-m.level:]), 'index.html'), 'w', 'utf-8').write(output)
 
 if __name__ == '__main__':
     if len(sys.argv) != 2:
