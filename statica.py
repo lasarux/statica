@@ -4,7 +4,7 @@ __author__ = "Pedro Gracia"
 __copyright__ = "Copyright 2012, Impulzia S.L."
 __credits__ = ["Pedro Gracia"]
 __license__ = "BSD"
-__version__ = "0.10"
+__version__ = "0.11"
 __maintainer__ = "Pedro Gracia"
 __email__ = "pedro.gracia@impulzia.com"
 __status__ = "Development"
@@ -23,12 +23,24 @@ from jinja2 import evalcontextfilter, contextfilter, Markup, escape
 from PIL import Image, ImageOps
 import jinja2.exceptions
 
-IMG_EXTENSION = ['jpg', 'jpeg', 'png', 'gif']
+#IMG_EXTENSION = ['jpg', 'jpeg', 'png', 'gif']
+STATIC_EXTENSIONS= {
+    'image': ['jpg', 'jpeg', 'png', 'gif'],
+    'icon': ['ico'],
+    'javascript': ['js'],
+    'style': ['css'], 
+    'media': ['mp3', 'mp4', 'ogg', 'ogv'],
+    'document': ['pdf', 'doc', 'xls', 'odt', 'ods', 'txt', 'csv', 'md'],
+    'archive': ['zip', 'rar', 'gz', 'tgz', 'bz'],
+    'installers': ['deb', 'rpm', 'apk', 'dmg', 'exe', 'msi'],
+    'others': ['xcf', 'svg']
+}
 SLOT_EMPTY = 'SLOT EMPTY - PLEASE FILL IN'
 
 # initialize makdown object
 md = markdown.Markdown(safe_mode=False, extensions=['tables']) #, 'superscript'])
 
+#TODO: use this function
 def get_cache(filename):
     if os.path.exists(filename):
         CACHE = pickle.load(filename)
@@ -40,6 +52,19 @@ def clean_line(line):
     if line.endswith('/n'):
         line = line[:-1]
     return line
+
+def get_type(filename):
+    """get type for a filename with its extension"""
+    ext = filename.split('.')[-1]
+    t = None
+    basename = None
+    # search type of extension
+    for key, values in STATIC_EXTENSIONS.items():
+        if ext.lower() in values:
+            t = key
+            basename = filename[:-(len(ext)+1)]
+            break
+    return t, basename
 
 def normalize(name):
     """convert name with spaces, minus or dots to name with underscores"""
@@ -58,7 +83,7 @@ def thumbnail(context, value, width, height,style=""):
     """thumbnail filter for jinja2"""
     thumb = ImageOps.fit(value.image, (width, height), Image.ANTIALIAS)
     path = os.path.join(BUILD_DIR, 'static', 'img', 'thumbnail', value.filename)
-    url = '%s/img/thumbnail/%s' % ('../' * PAGE.level, value.filename)
+    url = '%s/static/img/thumbnail/%s' % ('../' * (PAGE.level - 1), value.filename)
 
     try:
         os.makedirs(os.path.join(BUILD_DIR, 'static', 'img', 'thumbnail'))
@@ -79,28 +104,30 @@ def thumbnail(context, value, width, height,style=""):
 class Static:
     #TODO: use Item instead
     """Basic Object for css, js and images resources"""
-    def __init__(self, path):
-        self.css = {}
-        self.js = {}
-        self.img = {}
-        self.ico = {}
-        self.include(path, 'css')
-        self.include(path, 'js')
-        self.include(path, 'img')
-        self.include(path, 'ico')
+    def __init__(self, path, type):
+        self.path = path
+        self.type = type
+        self._url = '/'.join(path.split('/')[2:])
 
-    def include(self, path, d):
-        """walk throught static dirs to get files"""
-        for root, dirs, files in os.walk(os.path.join(path, d)):
-            for file in files:
-                key_split = file.split('.')
-                key = '.'.join(key_split[:-1])
-                r = getattr(self, d)
-                key = key.replace('-', '_').replace('.', '_')
-                r[key] = '%s/%s' % (d, file)
+    def __repr__(self):
+        if self.type == 'style':
+            res = '<link href="%s" rel="stylesheet" type="text/css">' % self.url()
+        elif self.type == 'icon':
+            res = '<link rel="shortcut icon" href="%s">' % self.url()
+        elif self.type == 'javascript':
+            res = '<script src="%s"></script>' % self.url()
+        else:
+            res = self.url()
+        return res
+        
+    def url(self):
+        res = '../' * (PAGE.level + 1) + self._url
+        return res
+        
 
 
 class Item:
+    """Item has become the most important class into statica. It've got a tree structure that maps"""
     def __init__(self, root, lang=None, parent=None, only_children=False, level=0):
         self.parent = parent
         self.root = root
@@ -110,21 +137,33 @@ class Item:
         self.children = []
         self.level = level
         self.lang = lang
-        self._url = '/'.join(root.split(os.path.sep)[-level:]) + '/index.html' # FIXME: split('/') doesn't work in windows
+        self._url = '/'.join(root.split(os.path.sep)[-level:])
 
-        #check if root is exists
+        #check if root exists
         if os.path.exists(root):
             self.parse_page()
             self.discover()
         else:
             print 'Warning: %s doesn\'t exists.' % root
 
-    def __repr__(self):
-        return '<%s: %s - %s>' % (self.type, self.root, self.lang)
+
+    def __unicode__(self):
+        return self.url()
 
     def url(self):
-        result = '../' * PAGE.level + self._url
-        return result
+        if self.type == 'page':
+            res = '../' * PAGE.level + self._url + '/index.html'
+        elif self.type in ['javascript', 'style']:
+            res = "TEST"
+        else:
+            res = self._url
+        return res
+        
+    def __repr__(self):
+        if hasattr('GLOBALS', 'PAGE'):
+            return self.url()
+        else:
+            return '<%s: %s - %s>' % (self.type, self.root, self.lang)
 
     def lang_url(self):
         result = '../' * (PAGE.level + 1) + '%s/%s' % (self.lang, self._url)
@@ -140,9 +179,11 @@ class Item:
         l = len(self._index)
         if hasattr(item, 'id'):
             id = item.id
-        else:
+        elif self.type == 'page':
             print "Item without id:  %s" % item
             id = 'zzzz'
+        else:
+            id = None
         if l > 0:
             for i in range(len(self._index)):
                 if id <= self._index[i]:
@@ -188,12 +229,13 @@ class Item:
             if os.path.isdir(path):
                 self.add_child(item, Item(path, lang=self.lang, parent=self, level=self.level + 1))
             else:
-                ext = item.split('.')[-1]
-                if ext.lower() in IMG_EXTENSION:
-                    name = item[:-(len(ext)+1)]
-                    self.add_value(name, Img(item, path))
+                t, basename = get_type(item)
+                if not self.type:
+                    self.type = t
+                if t == 'image':
+                    self.add_value(basename, Img(item, path))
                 else:
-                    self.add_value(item, path)
+                    self.add_value(basename, Static(path, t)) #TODO: use an object too
         return self
 
 
@@ -205,7 +247,7 @@ class Img:
         self._title = {}
         self._alt = {}
         self._description = {}
-        self._url = 'img/%s' % self.filename
+        self._url = 'static/img/%s' % self.filename
         self.build_path = os.path.join(BUILD_DIR, 'static', 'img', self.filename)
         dirname = os.path.dirname(path)
 
@@ -214,7 +256,7 @@ class Img:
 
     def url(self):
         # here we use the current page defined into main loop (it's a global variable)
-        result = '../' * PAGE.level + self._url
+        result = '../' * (PAGE.level + 1) + self._url
         return result
 
     def title(self):
@@ -250,13 +292,21 @@ class Img:
         except:
             pass
         self.image.save(self.build_path)
+        
+    def get(self, cl='', id=''):
+        res = '<img '
+        if cl:
+            res += 'class="%s" ' % cl
+        if id:
+            res += 'id="%s" '% id
+        res += 'src="%s" title="%s" alt="%s" />' % (self.url(), self.title(), self.alt())
+        return res
 
     def __repr__(self):
-            return self
+            return self.url()
         #return '<img src="%s" title="%s" alt="%s" />' % (self.url(), self.title(), self.alt())
 
 class Resource:
-    #TODO: review this and use Item
     def __init__(self):
         pass
 
@@ -355,12 +405,19 @@ def dyn(items):
 def walk(item, items):
     items = items
     for i in item.children:
+        print i
         items[i.id] = i
         if i.children:
             walk(i, items)
     return items
+    
+def run(item):
+    for i in item.children:
+        if i.children:
+            run(i)
 
-def main(project_path):
+def build(project_path):
+    """build project"""
     # main function
     #CACHE = get_cache('.cache')
 
@@ -368,12 +425,10 @@ def main(project_path):
     PROJECT_DIR = project_path
     BUILD_DIR = os.path.join(PROJECT_DIR, 'build')
     RESOURCES_DIR = os.path.join(PROJECT_DIR, 'resources')
-    RESOURCES_IMG_DIR = os.path.join(RESOURCES_DIR, 'img')
-    STATIC_DIR = os.path.join(PROJECT_DIR, 'static')
+    #RESOURCES_IMG_DIR = os.path.join(RESOURCES_DIR, 'img')
+    STATIC_DIR = os.path.join(RESOURCES_DIR, 'static')
     TEMPLATES_DIR = os.path.join(PROJECT_DIR, 'templates')
     TEMPLATE_DEFAULT = 'main.html'
-    #DEFAULT_LANGUAGE = 'ca'
-    #templates = {}
 
     exec("import %s as s" % PROJECT_DIR)
     globals()['LANGUAGES'] = s.LANGUAGES
@@ -416,7 +471,7 @@ def main(project_path):
     env = Environment(loader=FileSystemLoader(TEMPLATES_DIR))
     env.filters['thumbnail'] = thumbnail
     #template = env.get_template(TEMPLATE_DEFAULT)
-    res = Static(STATIC_DIR)
+    #res = Static(STATIC_DIR)
     builtins = {}
 
     # built-ins
@@ -436,15 +491,15 @@ def main(project_path):
 
     # process image galleries
     # TODO: remove this and use Item
-    galleries = {}
-    if os.path.exists(RESOURCES_IMG_DIR):
-        for dir in os.listdir(RESOURCES_IMG_DIR):
-            for root, dirs, files in os.walk(os.path.join(RESOURCES_IMG_DIR, dir)):
-                galleries[dir] = Gallery(root, dirs, files)
+    #galleries = {}
+    #if os.path.exists(RESOURCES_IMG_DIR):
+    #    for dir in os.listdir(RESOURCES_IMG_DIR):
+    #        for root, dirs, files in os.walk(os.path.join(RESOURCES_IMG_DIR, dir)):
+    #           galleries[dir] = Gallery(root, dirs, files)
 
     # process images
     # TODO: remove this and use Item
-    res_obj = Resource()
+    #res_obj = Resource()
 
     # process page files
     pages = {} #TODO: Page class?
@@ -454,8 +509,9 @@ def main(project_path):
         menu[lang[0]] = Item(os.path.join(RESOURCES_DIR, lang[0]), lang=lang[0], level=0)
         pages[lang[0]] = walk(Item(os.path.join(RESOURCES_DIR, lang[0]), lang=lang[0], level=0), items={})
 
-    resources_img = Item(os.path.join(RESOURCES_DIR, 'img'))
-
+    #resources_img = Item(os.path.join(RESOURCES_DIR, 'img'))
+    static = Item(STATIC_DIR)
+    
     for lang in s.LANGUAGES:
         for n, m in pages[lang[0]].items():
 
@@ -495,28 +551,28 @@ def main(project_path):
                 # write output file
                 boxes['current_language'] = m.lang
                 boxes['builtins'] = builtins
-                boxes['resource'] = res_obj
+                #boxes['resource'] = res_obj
                 boxes['page'] = m #TODO: better not in boxes?
-                boxes['gallery'] = {}
-                boxes['image'] = resources_img
+                #boxes['gallery'] = {}
+                #boxes['image'] = resources_img
                 boxes['lang_pages'] = lang_pages
 
                 menu_lang = menu[lang[0]].children
 
                 # gallery items
-                for key, value in galleries.items():
-                    boxes['gallery'][key] = value
+                #for key, value in galleries.items():
+                #    boxes['gallery'][key] = value
 
-                # dynamically build resources url
-                css = dyn(res.css)
-                js = dyn(res.js)
-                img = dyn(res.img)
-                ico = dyn(res.ico)
+                # dynamically build resources url (call to dyn function removed)
+                css = static.css
+                js = static.js
+                img = static.img
+                ico = static.ico
 
                 try:
                     output_md = template.render(css=css, js=js, img=img, ico=ico, menu=menu_lang, **boxes)
                 except jinja2.exceptions.UndefinedError:
-                    print "Warning, slot empty at %s" % m.name
+                    print "Warning, slot empty at %s" % m
                     output_md = SLOT_EMPTY
                 # second pass to use template engine within markdown output
                 env_md = Environment()
@@ -533,8 +589,11 @@ def main(project_path):
                 codecs.open(os.path.join(BUILD_DIR, m.lang, os.path.join(*m.root.split(os.path.sep)[-m.level:]), 'index.html'), 'w', 'utf-8').write(output)
 
 if __name__ == '__main__':
-    if len(sys.argv) != 2:
+    len_argv = len(sys.argv)
+    if len_argv == 1:
+        project_path = os.path.curdir
+    if len_argv != 2:
         sys.exit('Usage: %s path/to/project' % sys.argv[0])
 
-    project = sys.argv[1].endswith(os.path.sep) and sys.argv[1][:-1] or sys.argv[1] #nice line!!! :-)
-    main(project)
+    project_path = sys.argv[1].endswith(os.path.sep) and sys.argv[1][:-1] or sys.argv[1] #nice line!!! :-)
+    build(project_path)
