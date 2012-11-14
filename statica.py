@@ -79,11 +79,12 @@ def value_or_empty(value):
     return res
 
 @contextfilter
-def thumbnail(context, value, width, height,style=""):
+def thumbnail(context, value, width, height, style=""):
     """thumbnail filter for jinja2"""
     thumb = ImageOps.fit(value.image, (width, height), Image.ANTIALIAS)
-    path = os.path.join(BUILD_DIR, 'static', 'img', 'thumbnail', value.filename)
-    url = '%s/static/img/thumbnail/%s' % ('../' * (PAGE.level - 1), value.filename)
+    new_filename = '%s_%s' % (PAGE.lang, value.filename) #TODO: use md5sum
+    path = os.path.join(BUILD_DIR, 'static', 'img', 'thumbnail', new_filename)
+    url = '%s/static/img/thumbnail/%s' % ('../' * (PAGE.level + 1), new_filename)
 
     try:
         os.makedirs(os.path.join(BUILD_DIR, 'static', 'img', 'thumbnail'))
@@ -93,7 +94,7 @@ def thumbnail(context, value, width, height,style=""):
 
     if style:
         result = '<img class="%s" src="%s" title="%s" alt="%s"/>' % (style, url, value.title(), value.alt())
-        result += '<p><strong>%s</strong></p>' % value.description()
+        #result += '<p><strong>%s</strong></p>' % value.description() #FIXME: description goes out of here
     else:
         result = '<img src="%s" title="%s" alt="%s"/>' % (url, value.title(), value.alt())
 
@@ -119,7 +120,7 @@ class Static:
         else:
             res = self.url()
         return res
-        
+
     def url(self):
         res = '../' * (PAGE.level + 1) + self._url
         return res
@@ -287,7 +288,6 @@ class Img:
     def save(self):
         # save to build/static/img
         try:
-            # TODO: use dddrid
             os.makedirs(os.path.join(BUILD_DIR, 'static', 'img'))
         except:
             pass
@@ -303,7 +303,7 @@ class Img:
         return res
 
     def __repr__(self):
-            return self.url()
+        return self.get()
         #return '<img src="%s" title="%s" alt="%s" />' % (self.url(), self.title(), self.alt())
 
 class Resource:
@@ -563,23 +563,18 @@ def build(project_path):
                 #for key, value in galleries.items():
                 #    boxes['gallery'][key] = value
 
-                # dynamically build resources url (call to dyn function removed)
-                css = static.css
-                js = static.js
-                img = static.img
-                ico = static.ico
-
-                try:
-                    output_md = template.render(css=css, js=js, img=img, ico=ico, menu=menu_lang, **boxes)
-                except jinja2.exceptions.UndefinedError:
-                    print "Warning, slot empty at %s" % m
-                    output_md = SLOT_EMPTY
+                #try:
+                print n,m
+                output_md = template.render(css=static.css, js=static.js, img=static.img, ico=static.ico, menu=menu_lang, **boxes)
+                #except jinja2.exceptions.UndefinedError:
+                #    print "Warning, slot empty at %s" % m
+                #    output_md = SLOT_EMPTY
                 # second pass to use template engine within markdown output
                 env_md = Environment()
                 env_md.filters['thumbnail'] = thumbnail
                 template_md = env_md.from_string(output_md)
 
-                output = template_md.render(css=css, js=js, img=img, ico=ico, menu=menu_lang, **boxes)
+                output = template_md.render(css=static.css, js=static.js, img=static.img, ico=static.ico, menu=menu_lang, **boxes)
 
                 try:
                     os.makedirs(os.path.join(BUILD_DIR, os.path.join(*m.root.split(os.path.sep)[-m.level-1:])))
