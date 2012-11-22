@@ -4,7 +4,7 @@ __author__ = "Pedro Gracia"
 __copyright__ = "Copyright 2012, Impulzia S.L."
 __credits__ = ["Pedro Gracia"]
 __license__ = "BSD"
-__version__ = "0.11"
+__version__ = "0.12"
 __maintainer__ = "Pedro Gracia"
 __email__ = "pedro.gracia@impulzia.com"
 __status__ = "Development"
@@ -40,7 +40,7 @@ SLOT_EMPTY = 'SLOT EMPTY - PLEASE FILL IN'
 # initialize makdown object
 md = markdown.Markdown(safe_mode=False, extensions=['tables']) #, 'superscript'])
 
-#TODO: use this function
+#TODO: rethink this function
 def get_cache(filename):
     if os.path.exists(filename):
         CACHE = pickle.load(filename)
@@ -55,6 +55,11 @@ def clean_line(line):
 
 def get_type(filename):
     """get type for a filename with its extension"""
+    
+    #forbidden types
+    if filename.startswith('.') or filename.startswith('catalog.'):
+        return 'forbidden', filename
+    
     ext = filename.split('.')[-1]
     t = None
     basename = None
@@ -70,6 +75,7 @@ def normalize(name):
     """convert name with spaces, minus or dots to name with underscores"""
     return name.lower().replace(' ', '_').replace('-', '_').replace('.', '_')
 
+# TODO: remove this
 def value_or_empty(value):
     # PAGE is a global variable
     if value.has_key(PAGE.lang):
@@ -79,10 +85,10 @@ def value_or_empty(value):
     return res
 
 @contextfilter
-def thumbnail(context, value, width, height, style=""):
+def thumbnail(context, object, width, height, style=""):
     """thumbnail filter for jinja2"""
-    thumb = ImageOps.fit(value.image, (width, height), Image.ANTIALIAS)
-    new_filename = '%s_%s' % (PAGE.lang, value.filename) #TODO: use md5sum
+    thumb = ImageOps.fit(object.image, (width, height), Image.ANTIALIAS)
+    new_filename = '%s_%s' % (PAGE.lang, object.filename) #TODO: use md5sum
     path = os.path.join(BUILD_DIR, 'static', 'img', 'thumbnail', new_filename)
     url = '%s/static/img/thumbnail/%s' % ('../' * (PAGE.level + 1), new_filename)
 
@@ -93,14 +99,24 @@ def thumbnail(context, value, width, height, style=""):
     thumb.save(path)
 
     if style:
-        result = '<img class="%s" src="%s" title="%s" alt="%s"/>' % (style, url, value.title(), value.alt())
+        result = '<img class="%s" src="%s" title="%s" alt="%s" width="%i" height="%i" />' % (style, url, object.title, object.alt, width, height)
         #result += '<p><strong>%s</strong></p>' % value.description() #FIXME: description goes out of here
     else:
-        result = '<img src="%s" title="%s" alt="%s"/>' % (url, value.title(), value.alt())
+        result = '<img src="%s" title="%s" alt="%s" width="%i" height="%i" />' % (url, object.title, object.alt, width, height)
 
     if context.eval_ctx.autoescape:
-            result = Markup(result)
+        result = Markup(result)
     return result
+
+@contextfilter
+def partial(context, object, template):
+    """basic partial filter"""
+    template = ENV.get_template(template)
+    result = template.render(object=object)
+    if context.eval_ctx.autoescape:
+        result = Markup(result)
+    return result
+    
 
 class Static:
     #TODO: use Item instead
@@ -234,7 +250,15 @@ class Item:
                 if not self.type:
                     self.type = t
                 if t == 'image':
-                    self.add_value(basename, Img(item, path))
+                    img = Img(item, path)
+                    self.add_value(basename, img)
+                    for lang in LANGUAGES:
+                        gallery = getattr(img, '_gallery_%s' % lang[0]) or None
+                        if gallery:
+                            if GALLERY[lang[0]].has_key(gallery):
+                                GALLERY[lang[0]][gallery].append(img)
+                            else:
+                                GALLERY[lang[0]][gallery] = [img]
                 else:
                     self.add_value(basename, Static(path, t)) #TODO: use an object too
         return self
@@ -245,9 +269,6 @@ class Img:
         self.filename = filename
         self.name = '.'.join(filename.split('.')[:-1]).lower()
         self.image = Image.open(path)
-        self._title = {}
-        self._alt = {}
-        self._description = {}
         self._url = 'static/img/%s' % self.filename
         self.build_path = os.path.join(BUILD_DIR, 'static', 'img', self.filename)
         dirname = os.path.dirname(path)
@@ -260,15 +281,6 @@ class Img:
         result = '../' * (PAGE.level + 1) + self._url
         return result
 
-    def title(self):
-        return value_or_empty(self._title)
-
-    def alt(self):
-        return value_or_empty(self._alt)
-
-    def description(self):
-        return value_or_empty(self._description)
-
     def read_catalog(self, dirname):
         """read translated info about the image from language catalogs"""
         for lang in LANGUAGES:
@@ -277,13 +289,10 @@ class Img:
             except IOError:
                 break
             for line in lines:
-                if line.startswith('%s:' % self.name):
-                    values = ''.join(line.split(':')[1:])
-                    title, alt, description = values.split(',')
-                    self._title[lang[0]] = title.replace(';', ',')
-                    self._alt[lang[0]] = alt.replace(';', ',')
-                    self._description[lang[0]] = description.replace(';', ',')
-                    break
+                if line.startswith('%s.' % self.name):
+                    key = line.split(':')[0].split('.')[1] # format line: name.key:value
+                    value = ''.join(line.split(':')[1])[:-1] # remove \n with a function
+                    setattr(self, '_%s_%s' % (key, lang[0]), value) 
 
     def save(self):
         # save to build/static/img
@@ -299,24 +308,28 @@ class Img:
             res += 'class="%s" ' % cl
         if id:
             res += 'id="%s" '% id
-        res += 'src="%s" title="%s" alt="%s" />' % (self.url(), self.title(), self.alt())
+        res += 'src="%s" title="%s" alt="%s"/>' % (self.url(), self.title, self.alt)
         return res
 
-    def __repr__(self):
+    def __str__(self):
         return self.get()
         #return '<img src="%s" title="%s" alt="%s" />' % (self.url(), self.title(), self.alt())
+        
+    def __unicode__(self):
+        return self.get()
+        
+    def __repr__(self):
+        return self.get()
 
-class Resource:
-    def __init__(self):
-        pass
+    def __getattr__(self, field):
+        """ return values from object using page language """
+        try:
+            result = self.__dict__['_%s_%s' % (field, PAGE.lang)]
+        except:
+            result = ''
+        return result
 
-    def addfile(self, filename, path, title, alt):
-        # TODO: autodiscover type
-        name = '_'.join(filename.lower().split('.')[:-1])
-        img = Img(filename, path)
-        setattr(self, name, img)
-
-
+#TODO: remove this class and use Item class too
 class Gallery:
     """Image container"""
     def __init__(self, root, dirs, files):
@@ -405,7 +418,6 @@ def dyn(items):
 def walk(item, items):
     items = items
     for i in item.children:
-        print i
         items[i.id] = i
         if i.children:
             walk(i, items)
@@ -425,14 +437,26 @@ def build(project_path):
     PROJECT_DIR = project_path
     BUILD_DIR = os.path.join(PROJECT_DIR, 'build')
     RESOURCES_DIR = os.path.join(PROJECT_DIR, 'resources')
-    #RESOURCES_IMG_DIR = os.path.join(RESOURCES_DIR, 'img')
     STATIC_DIR = os.path.join(RESOURCES_DIR, 'static')
     TEMPLATES_DIR = os.path.join(PROJECT_DIR, 'templates')
     TEMPLATE_DEFAULT = 'main.html'
+    GALLERY = {}
 
+    # initialize jinja2 objects
+    env = Environment(loader=FileSystemLoader(TEMPLATES_DIR))
+    env.filters['thumbnail'] = thumbnail
+    env.filters['partial'] = partial
+
+    #TODO: avoid python import and use a config file instead
     exec("import %s as s" % PROJECT_DIR)
+    
+    for lang in s.LANGUAGES:
+        GALLERY[lang[0]] = {}
+
     globals()['LANGUAGES'] = s.LANGUAGES
     globals()['BUILD_DIR'] = BUILD_DIR
+    globals()['GALLERY'] = GALLERY
+    globals()['ENV'] = env
 
     google_analytics = Template("""<script type="text/javascript">
 
@@ -466,12 +490,7 @@ def build(project_path):
         });
       }
     </script>""")
-
-    # initialize jinja2 objects
-    env = Environment(loader=FileSystemLoader(TEMPLATES_DIR))
-    env.filters['thumbnail'] = thumbnail
-    #template = env.get_template(TEMPLATE_DEFAULT)
-    #res = Static(STATIC_DIR)
+    
     builtins = {}
 
     # built-ins
@@ -497,9 +516,6 @@ def build(project_path):
     #        for root, dirs, files in os.walk(os.path.join(RESOURCES_IMG_DIR, dir)):
     #           galleries[dir] = Gallery(root, dirs, files)
 
-    # process images
-    # TODO: remove this and use Item
-    #res_obj = Resource()
 
     # process page files
     pages = {} #TODO: Page class?
@@ -511,11 +527,12 @@ def build(project_path):
 
     #resources_img = Item(os.path.join(RESOURCES_DIR, 'img'))
     static = Item(STATIC_DIR)
-    
+        
     for lang in s.LANGUAGES:
         for n, m in pages[lang[0]].items():
 
             globals()['PAGE'] = m # current page goes to global 'page' var
+                        
             try:
                 t = '%s.html' % m.template.strip() #template
             except AttributeError:
@@ -562,19 +579,20 @@ def build(project_path):
                 # gallery items
                 #for key, value in galleries.items():
                 #    boxes['gallery'][key] = value
-
+                
+                #print "+++", GALLERY
                 #try:
-                print n,m
-                output_md = template.render(css=static.css, js=static.js, img=static.img, ico=static.ico, menu=menu_lang, **boxes)
+                output_md = template.render(css=static.css, js=static.js, img=static.img, ico=static.ico, menu=menu_lang, gallery=GALLERY[lang[0]], **boxes)
                 #except jinja2.exceptions.UndefinedError:
                 #    print "Warning, slot empty at %s" % m
                 #    output_md = SLOT_EMPTY
                 # second pass to use template engine within markdown output
                 env_md = Environment()
                 env_md.filters['thumbnail'] = thumbnail
+                env_md.filters['partial'] = thumbnail
                 template_md = env_md.from_string(output_md)
 
-                output = template_md.render(css=static.css, js=static.js, img=static.img, ico=static.ico, menu=menu_lang, **boxes)
+                output = template_md.render(css=static.css, js=static.js, img=static.img, ico=static.ico, menu=menu_lang, gallery=GALLERY[lang[0]], **boxes)
 
                 try:
                     os.makedirs(os.path.join(BUILD_DIR, os.path.join(*m.root.split(os.path.sep)[-m.level-1:])))
