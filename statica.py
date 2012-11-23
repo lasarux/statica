@@ -112,7 +112,7 @@ def thumbnail(context, object, width, height, style=""):
 def partial(context, object, template):
     """basic partial filter"""
     template = ENV.get_template(template)
-    result = template.render(object=object)
+    result = template.render(page=PAGE, object=object)
     if context.eval_ctx.autoescape:
         result = Markup(result)
     return result
@@ -290,8 +290,8 @@ class Img:
                 break
             for line in lines:
                 if line.startswith('%s.' % self.name):
-                    key = line.split(':')[0].split('.')[1] # format line: name.key:value
-                    value = ''.join(line.split(':')[1])[:-1] # remove \n with a function
+                    key = line.split(':')[0].split('.')[1].strip() # format line: name.key:value
+                    value = ''.join(line.split(':')[1])[:-1].strip() # remove \n with a function
                     setattr(self, '_%s_%s' % (key, lang[0]), value) 
 
     def save(self):
@@ -589,7 +589,7 @@ def build(project_path):
                 # second pass to use template engine within markdown output
                 env_md = Environment()
                 env_md.filters['thumbnail'] = thumbnail
-                env_md.filters['partial'] = thumbnail
+                env_md.filters['partial'] = partial
                 template_md = env_md.from_string(output_md)
 
                 output = template_md.render(css=static.css, js=static.js, img=static.img, ico=static.ico, menu=menu_lang, gallery=GALLERY[lang[0]], **boxes)
