@@ -4,7 +4,7 @@ __author__ = "Pedro Gracia"
 __copyright__ = "Copyright 2012, Impulzia S.L."
 __credits__ = ["Pedro Gracia"]
 __license__ = "BSD"
-__version__ = "0.12"
+__version__ = "0.13"
 __maintainer__ = "Pedro Gracia"
 __email__ = "pedro.gracia@impulzia.com"
 __status__ = "Development"
@@ -15,13 +15,17 @@ import re
 import codecs
 import pickle
 import md5
+from datetime import date
 from os.path import join, getsize
+
+import yaml
 import shutil
 import markdown
-from jinja2 import Environment, FileSystemLoader, Template
-from jinja2 import evalcontextfilter, contextfilter, Markup, escape
+
 from PIL import Image, ImageOps
 import jinja2.exceptions
+from jinja2 import Environment, FileSystemLoader, Template
+from jinja2 import evalcontextfilter, contextfilter, Markup, escape
 
 #IMG_EXTENSION = ['jpg', 'jpeg', 'png', 'gif']
 STATIC_EXTENSIONS= {
@@ -446,14 +450,20 @@ def build(project_path):
     env = Environment(loader=FileSystemLoader(TEMPLATES_DIR))
     env.filters['thumbnail'] = thumbnail
     env.filters['partial'] = partial
-
-    #TODO: avoid python import and use a config file instead
-    exec("import %s as s" % PROJECT_DIR)
     
-    for lang in s.LANGUAGES:
-        GALLERY[lang[0]] = {}
+    try:
+        config = open('%s/config.yml' % PROJECT_DIR)
+    except:
+        print "Error: create a config.yml file with project settings. __init__.py is deprecated."
+        sys.exit(2)
+    s = yaml.load(config) #settings
+    config.close()
 
-    globals()['LANGUAGES'] = s.LANGUAGES
+    for lang in s['LANGUAGES']:
+
+        GALLERY[lang] = {}
+
+    globals()['LANGUAGES'] = s['LANGUAGES']
     globals()['BUILD_DIR'] = BUILD_DIR
     globals()['GALLERY'] = GALLERY
     globals()['ENV'] = env
@@ -491,6 +501,22 @@ def build(project_path):
       }
     </script>""")
     
+    sitemap = Template("""<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  {% for url in sitemap %}
+  <url>
+    <loc>{{ url }}</loc>
+    <lastmod>{{ today }}</lastmod>
+    {% if page.changefreq %}
+    <changefreq>{{ page.changefreq }}</changefreq>
+    {% endif %}
+    {% if page.prority %}
+    <priority>{{ page.priority }}</priority>
+    {% endif %}
+  </url>
+  {% endfor %}
+</urlset> """)
+    
     builtins = {}
 
     # built-ins
@@ -520,16 +546,19 @@ def build(project_path):
     # process page files
     pages = {} #TODO: Page class?
     menu = {}
-    for lang in s.LANGUAGES:
+    for lang in s['LANGUAGES']:
         #TODO: join menus and pages ??
-        menu[lang[0]] = Item(os.path.join(RESOURCES_DIR, lang[0]), lang=lang[0], level=0)
-        pages[lang[0]] = walk(Item(os.path.join(RESOURCES_DIR, lang[0]), lang=lang[0], level=0), items={})
+        menu[lang] = Item(os.path.join(RESOURCES_DIR, lang), lang=lang, level=0)
+        pages[lang] = walk(Item(os.path.join(RESOURCES_DIR, lang), lang=lang, level=0), items={})
 
     #resources_img = Item(os.path.join(RESOURCES_DIR, 'img'))
     static = Item(STATIC_DIR)
-        
-    for lang in s.LANGUAGES:
-        for n, m in pages[lang[0]].items():
+    
+    sitemap_urls = []
+    
+    for lang in s['LANGUAGES']:
+        for n, m in pages[lang].items():
+            sitemap_urls.append('%s/%s' % (s['DOMAIN'], m._url))
 
             globals()['PAGE'] = m # current page goes to global 'page' var
                         
@@ -550,18 +579,10 @@ def build(project_path):
                         key = file.split('.')[0]
                         boxes[key] = box
 
-                # get each page with same name
-                #lang_pages = []
-                #for k, v in pages.items():
-                #    try:
-                #        lang_pages.append(v[m.title])
-                #    except KeyError:
-                #        print "Warning: missing info for '%s' language." % m.dir
-
                 lang_pages = {}
-                for l in s.LANGUAGES:
+                for l in s['LANGUAGES']:
                     try:
-                        lang_pages[l[0]] = pages[l[0]][m.id]
+                        lang_pages[l] = pages[l][m.id]
                     except KeyError:
                         print "Warning: missing info for '%s' language." % l
 
@@ -574,7 +595,7 @@ def build(project_path):
                 #boxes['image'] = resources_img
                 boxes['lang_pages'] = lang_pages
 
-                menu_lang = menu[lang[0]].children
+                menu_lang = menu[lang].children
 
                 # gallery items
                 #for key, value in galleries.items():
@@ -582,7 +603,7 @@ def build(project_path):
                 
                 #print "+++", GALLERY
                 #try:
-                output_md = template.render(css=static.css, js=static.js, img=static.img, ico=static.ico, menu=menu_lang, gallery=GALLERY[lang[0]], **boxes)
+                output_md = template.render(css=static.css, js=static.js, img=static.img, ico=static.ico, menu=menu_lang, gallery=GALLERY[lang], **boxes)
                 #except jinja2.exceptions.UndefinedError:
                 #    print "Warning, slot empty at %s" % m
                 #    output_md = SLOT_EMPTY
@@ -592,7 +613,7 @@ def build(project_path):
                 env_md.filters['partial'] = partial
                 template_md = env_md.from_string(output_md)
 
-                output = template_md.render(css=static.css, js=static.js, img=static.img, ico=static.ico, menu=menu_lang, gallery=GALLERY[lang[0]], **boxes)
+                output = template_md.render(css=static.css, js=static.js, img=static.img, ico=static.ico, menu=menu_lang, gallery=GALLERY[lang], **boxes)
 
                 try:
                     os.makedirs(os.path.join(BUILD_DIR, os.path.join(*m.root.split(os.path.sep)[-m.level-1:])))
@@ -600,6 +621,11 @@ def build(project_path):
                 except:
                     pass
                 codecs.open(os.path.join(BUILD_DIR, m.lang, os.path.join(*m.root.split(os.path.sep)[-m.level:]), 'index.html'), 'w', 'utf-8').write(output)
+
+    #write sitemap xml file
+    sitemap_lines = sitemap.render(sitemap=sitemap_urls, today=date.today().strftime('%Y-%M-%d'), page=m).split('\n')
+    xml = '\n'.join([x for x in sitemap_lines if x.strip()])
+    open('%s/sitemap.xml' % BUILD_DIR, 'w').write(xml)
 
 if __name__ == '__main__':
     len_argv = len(sys.argv)
