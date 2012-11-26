@@ -4,7 +4,7 @@ __author__ = "Pedro Gracia"
 __copyright__ = "Copyright 2012, Impulzia S.L."
 __credits__ = ["Pedro Gracia"]
 __license__ = "BSD"
-__version__ = "0.13"
+__version__ = "0.14"
 __maintainer__ = "Pedro Gracia"
 __email__ = "pedro.gracia@impulzia.com"
 __status__ = "Development"
@@ -40,6 +40,11 @@ STATIC_EXTENSIONS= {
     'others': ['xcf', 'svg']
 }
 SLOT_EMPTY = 'SLOT EMPTY - PLEASE FILL IN'
+PAGE = None
+LANGUAGES = None
+GALLERY = None
+BUILD_DIR = None
+ENV = None
 
 # initialize makdown object
 md = markdown.Markdown(safe_mode=False, extensions=['tables']) #, 'superscript'])
@@ -113,8 +118,9 @@ def thumbnail(context, object, width, height, style=""):
     return result
 
 @contextfilter
-def partial(context, object, template):
+def template(context, object, template):
     """basic partial filter"""
+    global ENV, PAGE
     template = ENV.get_template(template)
     result = template.render(page=PAGE, object=object)
     if context.eval_ctx.autoescape:
@@ -142,6 +148,7 @@ class Static:
         return res
 
     def url(self):
+        global PAGE
         res = '../' * (PAGE.level + 1) + self._url
         return res
         
@@ -172,6 +179,7 @@ class Item:
         return self.url()
 
     def url(self):
+        global PAGE
         if self.type == 'page':
             res = '../' * PAGE.level + self._url + '/index.html'
         elif self.type in ['javascript', 'style']:
@@ -187,6 +195,7 @@ class Item:
             return '<%s: %s - %s>' % (self.type, self.root, self.lang)
 
     def lang_url(self):
+        global PAGE
         result = '../' * (PAGE.level + 1) + '%s/%s' % (self.lang, self._url)
         return result
 
@@ -244,6 +253,7 @@ class Item:
             self.type = 'dir'
 
     def discover(self):
+        global LANGUAGES, GALLERY
         items = os.listdir(self.root)
         for item in items:
             path = os.path.join(self.root, item)
@@ -270,6 +280,7 @@ class Item:
 
 class Img:
     def __init__(self, filename, path):
+        global BUILD_DIR
         self.filename = filename
         self.name = '.'.join(filename.split('.')[:-1]).lower()
         self.image = Image.open(path)
@@ -282,11 +293,13 @@ class Img:
 
     def url(self):
         # here we use the current page defined into main loop (it's a global variable)
+        global PAGE
         result = '../' * (PAGE.level + 1) + self._url
         return result
 
     def read_catalog(self, dirname):
         """read translated info about the image from language catalogs"""
+        global LANGUAGES
         for lang in LANGUAGES:
             try:
                 lines = codecs.open('%s/catalog.%s' % (dirname, lang[0]), 'r', 'utf-8').readlines()
@@ -300,6 +313,7 @@ class Img:
 
     def save(self):
         # save to build/static/img
+        global BUILD_DIR
         try:
             os.makedirs(os.path.join(BUILD_DIR, 'static', 'img'))
         except:
@@ -327,6 +341,7 @@ class Img:
 
     def __getattr__(self, field):
         """ return values from object using page language """
+        global PAGE
         try:
             result = self.__dict__['_%s_%s' % (field, PAGE.lang)]
         except:
@@ -434,6 +449,7 @@ def run(item):
 
 def build(project_path):
     """build project"""
+    global LANGUAGES, BUILD_DIR, GALLERY, ENV
     # main function
     #CACHE = get_cache('.cache')
 
@@ -447,9 +463,10 @@ def build(project_path):
     GALLERY = {}
 
     # initialize jinja2 objects
-    env = Environment(loader=FileSystemLoader(TEMPLATES_DIR))
-    env.filters['thumbnail'] = thumbnail
-    env.filters['partial'] = partial
+    ENV = Environment(loader=FileSystemLoader(TEMPLATES_DIR))
+    ENV.filters['thumbnail'] = thumbnail
+    ENV.filters['template'] = template
+
     
     try:
         config = open('%s/config.yml' % PROJECT_DIR)
@@ -458,15 +475,11 @@ def build(project_path):
         sys.exit(2)
     s = yaml.load(config) #settings
     config.close()
+    
+    LANGUAGES = s['LANGUAGES']
 
-    for lang in s['LANGUAGES']:
-
+    for lang in LANGUAGES:
         GALLERY[lang] = {}
-
-    globals()['LANGUAGES'] = s['LANGUAGES']
-    globals()['BUILD_DIR'] = BUILD_DIR
-    globals()['GALLERY'] = GALLERY
-    globals()['ENV'] = env
 
     google_analytics = Template("""<script type="text/javascript">
 
@@ -501,9 +514,9 @@ def build(project_path):
       }
     </script>""")
     
-    sitemap = Template("""<?xml version="1.0" encoding="UTF-8"?>
+    sitemap_template = Template("""<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  {% for url in sitemap %}
+  {% for url in urls %}
   <url>
     <loc>{{ url }}</loc>
     <lastmod>{{ today }}</lastmod>
@@ -546,7 +559,7 @@ def build(project_path):
     # process page files
     pages = {} #TODO: Page class?
     menu = {}
-    for lang in s['LANGUAGES']:
+    for lang in LANGUAGES:
         #TODO: join menus and pages ??
         menu[lang] = Item(os.path.join(RESOURCES_DIR, lang), lang=lang, level=0)
         pages[lang] = walk(Item(os.path.join(RESOURCES_DIR, lang), lang=lang, level=0), items={})
@@ -554,11 +567,11 @@ def build(project_path):
     #resources_img = Item(os.path.join(RESOURCES_DIR, 'img'))
     static = Item(STATIC_DIR)
     
-    sitemap_urls = []
+    urls = []
     
-    for lang in s['LANGUAGES']:
+    for lang in LANGUAGES:
         for n, m in pages[lang].items():
-            sitemap_urls.append('%s/%s' % (s['DOMAIN'], m._url))
+            urls.append('%s/%s' % (s['DOMAIN'], m._url))
 
             globals()['PAGE'] = m # current page goes to global 'page' var
                         
@@ -567,7 +580,7 @@ def build(project_path):
             except AttributeError:
                 print "Warning: Using default template for %s." % m
                 t = '%s.html' % s.DEFAULT_TEMPLATE
-            template = env.get_template(t)
+            t = ENV.get_template(t)
 
             for root, dirs, files in os.walk(m.root):
                 boxes = {}
@@ -580,7 +593,7 @@ def build(project_path):
                         boxes[key] = box
 
                 lang_pages = {}
-                for l in s['LANGUAGES']:
+                for l in LANGUAGES:
                     try:
                         lang_pages[l] = pages[l][m.id]
                     except KeyError:
@@ -603,17 +616,18 @@ def build(project_path):
                 
                 #print "+++", GALLERY
                 #try:
-                output_md = template.render(css=static.css, js=static.js, img=static.img, ico=static.ico, menu=menu_lang, gallery=GALLERY[lang], **boxes)
+                output_md = t.render(css=static.css, js=static.js, img=static.img, ico=static.ico, menu=menu_lang, gallery=GALLERY[lang], **boxes)
                 #except jinja2.exceptions.UndefinedError:
                 #    print "Warning, slot empty at %s" % m
                 #    output_md = SLOT_EMPTY
                 # second pass to use template engine within markdown output
-                env_md = Environment()
-                env_md.filters['thumbnail'] = thumbnail
-                env_md.filters['partial'] = partial
-                template_md = env_md.from_string(output_md)
+                
+                #env_md = Environment()
+                #env_md.filters['thumbnail'] = thumbnail
+                #env_md.filters['template'] = template
+                t_md = ENV.from_string(output_md)
 
-                output = template_md.render(css=static.css, js=static.js, img=static.img, ico=static.ico, menu=menu_lang, gallery=GALLERY[lang], **boxes)
+                output = t_md.render(css=static.css, js=static.js, img=static.img, ico=static.ico, menu=menu_lang, gallery=GALLERY[lang], **boxes)
 
                 try:
                     os.makedirs(os.path.join(BUILD_DIR, os.path.join(*m.root.split(os.path.sep)[-m.level-1:])))
@@ -622,8 +636,9 @@ def build(project_path):
                     pass
                 codecs.open(os.path.join(BUILD_DIR, m.lang, os.path.join(*m.root.split(os.path.sep)[-m.level:]), 'index.html'), 'w', 'utf-8').write(output)
 
-    #write sitemap xml file
-    sitemap_lines = sitemap.render(sitemap=sitemap_urls, today=date.today().strftime('%Y-%M-%d'), page=m).split('\n')
+    # write sitemap xml file
+    # jinja2 can't do {{ spaceless }} :-(
+    sitemap_lines = sitemap_template.render(urls=urls, today=date.today().strftime('%Y-%M-%d'), page=m).split('\n')
     xml = '\n'.join([x for x in sitemap_lines if x.strip()])
     open('%s/sitemap.xml' % BUILD_DIR, 'w').write(xml)
 
