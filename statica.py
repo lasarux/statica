@@ -4,7 +4,7 @@ __author__ = "Pedro Gracia"
 __copyright__ = "Copyright 2012, Impulzia S.L."
 __credits__ = ["Pedro Gracia"]
 __license__ = "BSD"
-__version__ = "0.14"
+__version__ = "0.15"
 __maintainer__ = "Pedro Gracia"
 __email__ = "pedro.gracia@impulzia.com"
 __status__ = "Development"
@@ -42,7 +42,7 @@ STATIC_EXTENSIONS= {
 SLOT_EMPTY = 'SLOT EMPTY - PLEASE FILL IN'
 PAGE = None
 LANGUAGES = None
-GALLERY = None
+GALLERY = {}
 BUILD_DIR = None
 ENV = None
 
@@ -267,12 +267,12 @@ class Item:
                     img = Img(item, path)
                     self.add_value(basename, img)
                     for lang in LANGUAGES:
-                        gallery = getattr(img, '_gallery_%s' % lang[0]) or None
+                        gallery = getattr(img, '_gallery_%s' % lang) or None
                         if gallery:
-                            if GALLERY[lang[0]].has_key(gallery):
-                                GALLERY[lang[0]][gallery].append(img)
+                            if GALLERY[lang].has_key(gallery):
+                                GALLERY[lang][gallery].append(img)
                             else:
-                                GALLERY[lang[0]][gallery] = [img]
+                                GALLERY[lang][gallery] = [img]
                 else:
                     self.add_value(basename, Static(path, t)) #TODO: use an object too
         return self
@@ -302,14 +302,14 @@ class Img:
         global LANGUAGES
         for lang in LANGUAGES:
             try:
-                lines = codecs.open('%s/catalog.%s' % (dirname, lang[0]), 'r', 'utf-8').readlines()
+                lines = codecs.open('%s/catalog.%s' % (dirname, lang), 'r', 'utf-8').readlines()
             except IOError:
                 break
             for line in lines:
                 if line.startswith('%s.' % self.name):
                     key = line.split(':')[0].split('.')[1].strip() # format line: name.key:value
                     value = ''.join(line.split(':')[1])[:-1].strip() # remove \n with a function
-                    setattr(self, '_%s_%s' % (key, lang[0]), value) 
+                    setattr(self, '_%s_%s' % (key, lang), value) 
 
     def save(self):
         # save to build/static/img
@@ -460,7 +460,6 @@ def build(project_path):
     STATIC_DIR = os.path.join(RESOURCES_DIR, 'static')
     TEMPLATES_DIR = os.path.join(PROJECT_DIR, 'templates')
     TEMPLATE_DEFAULT = 'main.html'
-    GALLERY = {}
 
     # initialize jinja2 objects
     ENV = Environment(loader=FileSystemLoader(TEMPLATES_DIR))
@@ -614,7 +613,6 @@ def build(project_path):
                 #for key, value in galleries.items():
                 #    boxes['gallery'][key] = value
                 
-                #print "+++", GALLERY
                 #try:
                 output_md = t.render(css=static.css, js=static.js, img=static.img, ico=static.ico, menu=menu_lang, gallery=GALLERY[lang], **boxes)
                 #except jinja2.exceptions.UndefinedError:
