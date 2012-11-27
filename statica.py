@@ -603,7 +603,6 @@ def build(project_path):
                 #    boxes['gallery'][key] = value
                 
                 #try:
-                print I18N
                 output_md = t.render(css=static.css, js=static.js, img=static.img, ico=static.ico, menu=menu_lang, gallery=GALLERY[lang], i18n=I18N[lang], **boxes)
                 #except jinja2.exceptions.UndefinedError:
                 #    print "Warning, slot empty at %s" % m
