@@ -4,7 +4,7 @@ __author__ = "Pedro Gracia"
 __copyright__ = "Copyright 2012, Impulzia S.L."
 __credits__ = ["Pedro Gracia"]
 __license__ = "BSD"
-__version__ = "0.15"
+__version__ = "0.16"
 __maintainer__ = "Pedro Gracia"
 __email__ = "pedro.gracia@impulzia.com"
 __status__ = "Development"
@@ -119,8 +119,7 @@ def thumbnail(context, object, width, height, style=""):
 
 @contextfilter
 def template(context, object, template):
-    """basic partial filter"""
-    global ENV, PAGE
+    """template filter for jinja2"""
     template = ENV.get_template(template)
     result = template.render(page=PAGE, object=object)
     if context.eval_ctx.autoescape:
@@ -129,7 +128,6 @@ def template(context, object, template):
     
 
 class Static:
-    #TODO: use Item instead
     """Basic Object for css, js and images resources"""
     def __init__(self, path, type):
         self.path = path
@@ -424,16 +422,6 @@ class Box:
                 setattr(self, attr, value)
         self.get_html()
 
-
-def dyn(items):
-    items_pre = {}
-    pre = '../' * (PAGE.level +1) #page.pre
-    for k,v in items.items():
-        items_pre[k] = '%s/static/%s' % (pre[:-1], v)
-    return items_pre
-
-
-# TEST: to show pages
 def walk(item, items):
     items = items
     for i in item.children:
@@ -476,6 +464,7 @@ def build(project_path):
     config.close()
     
     LANGUAGES = s['LANGUAGES']
+    I18N = s['I18N']
 
     for lang in LANGUAGES:
         GALLERY[lang] = {}
@@ -614,7 +603,8 @@ def build(project_path):
                 #    boxes['gallery'][key] = value
                 
                 #try:
-                output_md = t.render(css=static.css, js=static.js, img=static.img, ico=static.ico, menu=menu_lang, gallery=GALLERY[lang], **boxes)
+                print I18N
+                output_md = t.render(css=static.css, js=static.js, img=static.img, ico=static.ico, menu=menu_lang, gallery=GALLERY[lang], i18n=I18N[lang], **boxes)
                 #except jinja2.exceptions.UndefinedError:
                 #    print "Warning, slot empty at %s" % m
                 #    output_md = SLOT_EMPTY
@@ -625,7 +615,7 @@ def build(project_path):
                 #env_md.filters['template'] = template
                 t_md = ENV.from_string(output_md)
 
-                output = t_md.render(css=static.css, js=static.js, img=static.img, ico=static.ico, menu=menu_lang, gallery=GALLERY[lang], **boxes)
+                output = t_md.render(css=static.css, js=static.js, img=static.img, ico=static.ico, menu=menu_lang, gallery=GALLERY[lang], i18n=I18N[lang], **boxes)
 
                 try:
                     os.makedirs(os.path.join(BUILD_DIR, os.path.join(*m.root.split(os.path.sep)[-m.level-1:])))
