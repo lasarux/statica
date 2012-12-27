@@ -125,11 +125,10 @@ class Static:
     def __init__(self, path, type):
         self.path = path
         self.type = type
-        self._url = '/'.join(path.split('/')[2:])
+        self._url = '/'.join(path.split(os.path.sep)[2:])
 
     def __repr__(self):
         if self.type == 'style':
-            print "PAGE:", PAGE, "css:", self.url(), self.path 
             res = '<link href="%s" rel="stylesheet" type="text/css">' % self.url()
         elif self.type == 'icon':
             res = '<link rel="shortcut icon" href="%s">' % self.url()
