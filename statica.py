@@ -4,7 +4,7 @@ __author__ = "Pedro Gracia"
 __copyright__ = "Copyright 2012, Impulzia S.L."
 __credits__ = ["Pedro Gracia"]
 __license__ = "BSD"
-__version__ = "0.16"
+__version__ = "0.17"
 __maintainer__ = "Pedro Gracia"
 __email__ = "pedro.gracia@impulzia.com"
 __status__ = "Development"
@@ -48,13 +48,6 @@ ENV = None
 
 # initialize makdown object
 md = markdown.Markdown(safe_mode=False, extensions=['tables']) #, 'superscript'])
-
-#TODO: rethink this function
-def get_cache(filename):
-    if os.path.exists(filename):
-        CACHE = pickle.load(filename)
-    else:
-        CACHE = {}
 
 def clean_line(line):
     """clean data line before process it"""
@@ -136,6 +129,7 @@ class Static:
 
     def __repr__(self):
         if self.type == 'style':
+            print "PAGE:", PAGE, "css:", self.url(), self.path 
             res = '<link href="%s" rel="stylesheet" type="text/css">' % self.url()
         elif self.type == 'icon':
             res = '<link rel="shortcut icon" href="%s">' % self.url()
@@ -146,6 +140,7 @@ class Static:
         return res
 
     def url(self):
+        """returns a valid relative url"""
         global PAGE
         res = '../' * (PAGE.level + 1) + self._url
         return res
@@ -153,7 +148,7 @@ class Static:
 
 
 class Item:
-    """Item has become the most important class into statica. It've got a tree structure that maps"""
+    """Item has become the most important class into statica. It have got a tree structure"""
     def __init__(self, root, lang=None, parent=None, only_children=False, level=0):
         self.parent = parent
         self.root = root
@@ -180,6 +175,7 @@ class Item:
         global PAGE
         if self.type == 'page':
             res = '../' * PAGE.level + self._url + '/index.html'
+        #TODO: fix this
         elif self.type in ['javascript', 'style']:
             res = "TEST"
         else:
@@ -187,21 +183,25 @@ class Item:
         return res
         
     def __repr__(self):
+        #TODO: remove this check if it's possible
         if hasattr('GLOBALS', 'PAGE'):
             return self.url()
         else:
             return '<%s: %s - %s>' % (self.type, self.root, self.lang)
 
     def lang_url(self):
+        """returns page url with lang"""
         global PAGE
         result = '../' * (PAGE.level + 1) + '%s/%s' % (self.lang, self._url)
         return result
 
     def add_value(self, name, item):
+        """add an attribute (name) with a value (item)"""
         if not self.only_children:
             setattr(self, normalize(name), item)
 
     def add_child(self, name, item):
+        """help to build an ordered menu directly from directory structure"""
         self.add_value(name, item)
         item.parent = self # add parent (self) to item
         l = len(self._index)
@@ -227,6 +227,7 @@ class Item:
             self.children.append(item)
 
     def parse_page(self):
+        """read params from page.md -> key: value"""
         # TODO: use item for images too?
         if os.path.exists('%s/page.md' % self.root):
             self.type = 'page'
@@ -235,22 +236,17 @@ class Item:
             for line in lines:
                 data = clean_line(line).split(':')
                 key = data[0]
-                values = ''.join(data[1:]).strip('\r\n') # drop '\n'
-                if values.strip == '':
+                value = ''.join(data[1:]).strip('\r\n').strip() # drop '\n'
+                if value == '':
                     break
-                else:
-                    value = values
-                    #try:
-                        # to eval a string is cool! (maths are welcome)
-                    #    value = eval(values)
-                    #except:
-                    #    value = values
-                    setattr(self, key, value)
-
+                elif value[0] == '!': #if value starts with ! then eval expression
+                    value = eval(value[1:])
+                setattr(self, key, value)
         else:
             self.type = 'dir'
 
     def discover(self):
+        """recursively discover items in directory object (self.root) and subdirectories"""
         global LANGUAGES, GALLERY
         items = os.listdir(self.root)
         for item in items:
@@ -423,23 +419,18 @@ class Box:
         self.get_html()
 
 def walk(item, items):
+    """return a dictionary with children from item"""
     items = items
     for i in item.children:
         items[i.id] = i
         if i.children:
             walk(i, items)
     return items
-    
-def run(item):
-    for i in item.children:
-        if i.children:
-            run(i)
+
 
 def build(project_path):
-    """build project"""
+    """build project (main loop)"""
     global LANGUAGES, BUILD_DIR, GALLERY, ENV
-    # main function
-    #CACHE = get_cache('.cache')
 
     # initial constants
     PROJECT_DIR = project_path
@@ -454,21 +445,24 @@ def build(project_path):
     ENV.filters['thumbnail'] = thumbnail
     ENV.filters['template'] = template
 
-    
+    # read settings file (yaml format) - config.yml
     try:
         config = open('%s/config.yml' % PROJECT_DIR)
     except:
         print "Error: create a config.yml file with project settings. __init__.py is deprecated."
         sys.exit(2)
-    s = yaml.load(config) #settings
+    s = yaml.load(config)
     config.close()
     
+    # assing data from settings to LANGUAGE and I18N
     LANGUAGES = s['LANGUAGES']
     I18N = s['I18N']
 
+    # init an empty GALLERY object with language keys
     for lang in LANGUAGES:
         GALLERY[lang] = {}
 
+    #TODO: use external template for google_analytics
     google_analytics = Template("""<script type="text/javascript">
 
         var _gaq = _gaq || [];
@@ -483,6 +477,7 @@ def build(project_path):
 
       </script>""")
 
+    #TODO: use external template for google maps
     google_maps = Template("""<script src="https://maps.googleapis.com/maps/api/js?sensor=false"></script>
     <script>
       function initialize() {
@@ -501,7 +496,8 @@ def build(project_path):
         });
       }
     </script>""")
-    
+
+    #TODO: use external template for sitemap
     sitemap_template = Template("""<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   {% for url in urls %}
@@ -527,24 +523,15 @@ def build(project_path):
     except:
         print "Warning! There aren't information to setup Google services."
 
-    # copy static/ to build/static
+    # copy full static/ to build/static
     try:
         shutil.rmtree(os.path.join(BUILD_DIR, 'static'))
     except:
         pass
-
     shutil.copytree(STATIC_DIR, os.path.join(BUILD_DIR, 'static'))
 
-    # process image galleries
-    # TODO: remove this and use Item
-    #galleries = {}
-    #if os.path.exists(RESOURCES_IMG_DIR):
-    #    for dir in os.listdir(RESOURCES_IMG_DIR):
-    #        for root, dirs, files in os.walk(os.path.join(RESOURCES_IMG_DIR, dir)):
-    #           galleries[dir] = Gallery(root, dirs, files)
 
-
-    # process page files
+    # get pages and menu
     pages = {} #TODO: Page class?
     menu = {}
     for lang in LANGUAGES:
@@ -552,11 +539,10 @@ def build(project_path):
         menu[lang] = Item(os.path.join(RESOURCES_DIR, lang), lang=lang, level=0)
         pages[lang] = walk(Item(os.path.join(RESOURCES_DIR, lang), lang=lang, level=0), items={})
 
-    #resources_img = Item(os.path.join(RESOURCES_DIR, 'img'))
     static = Item(STATIC_DIR)
     
+    # process pages in each language
     urls = []
-    
     for lang in LANGUAGES:
         for n, m in pages[lang].items():
             urls.append('%s/%s' % (s['DOMAIN'], m._url))
@@ -590,32 +576,16 @@ def build(project_path):
                 # write output file
                 boxes['current_language'] = m.lang
                 boxes['builtins'] = builtins
-                #boxes['resource'] = res_obj
                 boxes['page'] = m #TODO: better not in boxes?
-                #boxes['gallery'] = {}
-                #boxes['image'] = resources_img
                 boxes['lang_pages'] = lang_pages
-
                 menu_lang = menu[lang].children
 
-                # gallery items
-                #for key, value in galleries.items():
-                #    boxes['gallery'][key] = value
-                
-                #try:
+                # render templates twice in order to use jinja2 into markdown files
                 output_md = t.render(css=static.css, js=static.js, img=static.img, ico=static.ico, menu=menu_lang, gallery=GALLERY[lang], i18n=I18N[lang], **boxes)
-                #except jinja2.exceptions.UndefinedError:
-                #    print "Warning, slot empty at %s" % m
-                #    output_md = SLOT_EMPTY
-                # second pass to use template engine within markdown output
-                
-                #env_md = Environment()
-                #env_md.filters['thumbnail'] = thumbnail
-                #env_md.filters['template'] = template
                 t_md = ENV.from_string(output_md)
-
                 output = t_md.render(css=static.css, js=static.js, img=static.img, ico=static.ico, menu=menu_lang, gallery=GALLERY[lang], i18n=I18N[lang], **boxes)
 
+                # save html file
                 try:
                     os.makedirs(os.path.join(BUILD_DIR, os.path.join(*m.root.split(os.path.sep)[-m.level-1:])))
                     print "directory %s created." % os.path.join(BUILD_DIR, m.lang, os.path.join(m.root.split(os.path.sep)[-m.level-1:]))
