@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 
 __author__ = "Pedro Gracia"
-__copyright__ = "Copyright 2012, Impulzia S.L."
+__copyright__ = "Copyright 2012-2013, Impulzia S.L."
 __credits__ = ["Pedro Gracia"]
 __license__ = "BSD"
-__version__ = "0.17"
+__version__ = "0.18"
 __maintainer__ = "Pedro Gracia"
 __email__ = "pedro.gracia@impulzia.com"
 __status__ = "Development"
@@ -59,7 +59,7 @@ def get_type(filename):
     """get type for a filename with its extension"""
     
     #forbidden types
-    if filename.startswith('.') or filename.startswith('catalog.'):
+    if filename.startswith('.') or filename.startswith('catalog.') or filename=='Thumbs.db':
         return 'forbidden', filename
     
     ext = filename.split('.')[-1]
@@ -277,10 +277,10 @@ class Img:
         self.filename = filename
         self.name = '.'.join(filename.split('.')[:-1]).lower()
         self.image = Image.open(path)
+        self.image_raw = open(path).read()
         self._url = 'static/img/%s' % self.filename
         self.build_path = os.path.join(BUILD_DIR, 'static', 'img', self.filename)
         dirname = os.path.dirname(path)
-
         self.read_catalog(dirname)
         self.save()
 
@@ -311,7 +311,8 @@ class Img:
             os.makedirs(os.path.join(BUILD_DIR, 'static', 'img'))
         except:
             pass
-        self.image.save(self.build_path)
+        #self.image.save(self.build_path)
+        open(self.build_path, 'w').write(self.image_raw)
         
     def get(self, cl='', id=''):
         res = '<img '
@@ -552,7 +553,7 @@ def build(project_path):
                 t = '%s.html' % m.template.strip() #template
             except AttributeError:
                 print "Warning: Using default template for %s." % m
-                t = '%s.html' % s.DEFAULT_TEMPLATE
+                t = '%s.html' % s['DEFAULT_TEMPLATE']
             t = ENV.get_template(t)
 
             for root, dirs, files in os.walk(m.root):
@@ -581,6 +582,9 @@ def build(project_path):
 
                 # render templates twice in order to use jinja2 into markdown files
                 output_md = t.render(css=static.css, js=static.js, img=static.img, ico=static.ico, menu=menu_lang, gallery=GALLERY[lang], i18n=I18N[lang], **boxes)
+                # add target to external links
+                output_md = output_md.replace('<a href="http:', '<a target=\'_blank\' href="http:')
+                
                 t_md = ENV.from_string(output_md)
                 output = t_md.render(css=static.css, js=static.js, img=static.img, ico=static.ico, menu=menu_lang, gallery=GALLERY[lang], i18n=I18N[lang], **boxes)
 
