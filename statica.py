@@ -277,7 +277,7 @@ class Img:
         self.filename = filename
         self.name = '.'.join(filename.split('.')[:-1]).lower()
         self.image = Image.open(path)
-        self.image_raw = open(path).read()
+        self.image_raw = open(path, 'rb').read()
         self._url = 'static/img/%s' % self.filename
         self.build_path = os.path.join(BUILD_DIR, 'static', 'img', self.filename)
         dirname = os.path.dirname(path)
@@ -390,6 +390,9 @@ class Box:
         # read attributes until empty line or not key-value pair
         is_header = True
         for line in self.lines:
+            # check for attributes at first line
+            if is_header and not ':' in line:
+                is_header = False
             # add line to markdown if it isn't header
             if not is_header:
                 self.md += line + '\n'
@@ -401,10 +404,11 @@ class Box:
                 data = clean_line(line).split(":")
 
                 # end of header
-                if len(data) == 1:
+                if len(data) == 0:
                     is_header = False
                     self.md += line + ' '
                     continue
+
                 # add attribute to this object
                 attr = data[0]
                 value = data[1].strip('\r\n')
@@ -415,7 +419,11 @@ class Box:
                 #except:
                 #value = data
                 #    if t: print "+++", attr, value
-                setattr(self, attr, value)
+                try:
+                    setattr(self, attr, value)
+                except:
+                    print 'Error reading file %s. Please, review that file.' % self.filename
+                    sys.exit(1)
         self.get_html()
 
 def walk(item, items):
